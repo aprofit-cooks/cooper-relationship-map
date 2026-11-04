@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NC Senate Race 2026 — Candidate Relationship Networks</title>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.com/3d-force-graph@1.73.3/dist/3d-force-graph.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0e27;
+    color: #e2e8f0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+  }
+  #graph-container { width: 100vw; height: 100vh; }
+
+  /* Tooltip */
+  #tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(100, 116, 139, 0.4);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    max-width: 280px;
+    z-index: 1000;
+    display: none;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  #tooltip .tt-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  #tooltip .tt-type { color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  #tooltip .tt-info { margin-top: 4px; font-size: 12px; color: #cbd5e1; }
+
+  /* Side Panel */
+  #side-panel {
+    position: fixed;
+    top: 0; right: -420px;
+    width: 420px; height: 100vh;
+    background: rgba(15, 23, 42, 0.97);
+    border-left: 1px solid rgba(100, 116, 139, 0.3);
+    z-index: 900;
+    transition: right 0.3s ease;
+    overflow-y: auto;
+    padding: 24px;
+    backdrop-filter: blur(12px);
+  }
+  #side-panel.open { right: 0; }
+  #side-panel .sp-close {
+    position: absolute; top: 12px; right: 16px;
+    cursor: pointer; font-size: 20px; color: #94a3b8;
+    background: none; border: none; padding: 4px 8px;
+  }
+  #side-panel .sp-close:hover { color: #fff; }
+  #side-panel .sp-name { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  #side-panel .sp-type { color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+  .sp-edge {
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(100, 116, 139, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .sp-edge-cat { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 4px; }
+  .sp-edge-detail { font-size: 13px; color: #e2e8f0; margin-bottom: 4px; }
+  .sp-edge-period { font-size: 11px; color: #94a3b8; }
+  .sp-edge-evidence { font-size: 12px; color: #cbd5e1; margin-top: 6px; font-style: italic; }
+  .sp-edge-link { font-size: 12px; margin-top: 4px; }
+  .sp-edge-link a { color: #3b82f6; text-decoration: none; }
+  .sp-edge-link a:hover { text-decoration: underline; }
+  .sp-edge-target { font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 6px; }
+
+  /* Filter Panel */
+  #filter-panel {
+    position: fixed;
+    top: 16px; left: 16px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(100, 116, 139, 0.3);
+    border-radius: 12px;
+    padding: 16px 18px;
+    z-index: 800;
+    min-width: 240px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    font-size: 13px;
+  }
+  #filter-panel h3 {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #f1f5f9;
+    letter-spacing: 0.3px;
+  }
+  .filter-section {
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(100, 116, 139, 0.15);
+  }
+  .filter-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .filter-section label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: #94a3b8;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .filter-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+    cursor: pointer;
+  }
+  .filter-row input[type="checkbox"] {
+    margin-right: 8px;
+    accent-color: #3b82f6;
+  }
+  .filter-row span { font-size: 12px; color: #cbd5e1; }
+  .color-dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+    flex-shrink: 0;
+  }
+
+  /* Search */
+  #search-box {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid rgba(100, 116, 139, 0.3);
+    border-radius: 6px;
+    background: rgba(30, 41, 59, 0.6);
+    color: #e2e8f0;
+    font-size: 13px;
+    outline: none;
+    margin-bottom: 6px;
+  }
+  #search-box::placeholder { color: #64748b; }
+  #search-box:focus { border-color: #3b82f6; }
+  #search-results {
+    max-height: 120px;
+    overflow-y: auto;
+    margin-bottom: 6px;
+  }
+  .search-result {
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .search-result:hover { background: rgba(59, 130, 246, 0.2); }
+
+  /* Legend */
+  #legend {
+    position: fixed;
+    bottom: 16px; left: 16px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(100, 116, 139, 0.3);
+    border-radius: 12px;
+    padding: 14px 16px;
+    z-index: 800;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    font-size: 12px;
+    max-width: 280px;
+  }
+  #legend h4 { font-size: 12px; font-weight: 700; margin-bottom: 8px; color: #f1f5f9; }
+  .legend-item { display: flex; align-items: center; margin-bottom: 3px; }
+  .legend-line {
+    display: inline-block;
+    width: 18px; height: 3px;
+    border-radius: 2px;
+    margin-right: 6px;
+    flex-shrink: 0;
+  }
+
+  /* Stats panel */
+  #stats-panel {
+    position: fixed;
+    bottom: 16px; right: 16px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(100, 116, 139, 0.3);
+    border-radius: 12px;
+    padding: 14px 16px;
+    z-index: 800;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    font-size: 12px;
+    min-width: 220px;
+  }
+  #stats-panel h4 { font-size: 12px; font-weight: 700; margin-bottom: 8px; color: #f1f5f9; }
+  .stat-row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+  .stat-label { color: #94a3b8; }
+  .stat-value { color: #e2e8f0; font-weight: 600; }
+  .stat-sub { margin-left: 10px; font-size: 11px; }
+
+  /* Top buttons */
+  #top-buttons {
+    position: fixed;
+    top: 16px; right: 16px;
+    z-index: 800;
+    display: flex; gap: 8px;
+  }
+  .top-btn {
+    background: rgba(30, 41, 59, 0.9);
+    border: 1px solid rgba(100, 116, 139, 0.3);
+    color: #e2e8f0;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s;
+    backdrop-filter: blur(8px);
+  }
+  .top-btn:hover { background: rgba(59, 130, 246, 0.3); border-color: #3b82f6; }
+  .top-btn.active { background: rgba(59, 130, 246, 0.4); border-color: #3b82f6; }
+
+  /* Title */
+  #title-bar {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 800;
+    text-align: center;
+    pointer-events: none;
+  }
+  #title-bar h1 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #f1f5f9;
+    letter-spacing: 0.5px;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  #title-bar .subtitle {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 2px;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.3); border-radius: 3px; }
+
+  /* Collapsible filter panel */
+  #filter-toggle {
+    display: none;
+    position: fixed;
+    top: 16px; left: 16px;
+    z-index: 801;
+  }
+</style>
+</head>
+<body>
+
+<div id="graph-container"></div>
+<div id="tooltip"></div>
+
+<!-- Title -->
+<div id="title-bar">
+  <h1>NC Senate Race 2026 — Candidate Relationship Networks</h1>
+  <div class="subtitle">Interactive political network visualization</div>
+</div>
+
+<!-- Top Buttons -->
+<div id="top-buttons">
+  <button class="top-btn active" id="btn-3d" onclick="setView('3d')">3D View</button>
+  <button class="top-btn" id="btn-2d" onclick="setView('2d')">2D View</button>
+  <button class="top-btn" id="btn-export" onclick="exportPNG()">Export PNG</button>
+</div>
+
+<!-- Filter Panel -->
+<div id="filter-panel">
+  <h3>Filters</h3>
+
+  <div class="filter-section">
+    <label>Search</label>
+    <input type="text" id="search-box" placeholder="Find a node..." oninput="onSearch(this.value)">
+    <div id="search-results"></div>
+  </div>
+
+  <div class="filter-section">
+    <label>Candidate Network</label>
+    <div class="filter-row"><input type="checkbox" id="f-cooper" checked onchange="applyFilters()"><span style="color:#3b82f6">Cooper</span></div>
+    <div class="filter-row"><input type="checkbox" id="f-whatley" checked onchange="applyFilters()"><span style="color:#ef4444">Whatley</span></div>
+  </div>
+
+  <div class="filter-section">
+    <label>Relationship Type</label>
+    <div id="rel-type-filters"></div>
+  </div>
+
+  <div class="filter-section">
+    <label>Node Type</label>
+    <div id="node-type-filters"></div>
+  </div>
+
+  <div class="filter-section">
+    <label>Special Filters</label>
+    <div class="filter-row"><input type="checkbox" id="f-sitting" onchange="applyFilters()"><span>Sitting members only</span></div>
+    <div class="filter-row"><input type="checkbox" id="f-bridge" onchange="applyFilters()"><span>Bridge nodes only</span></div>
+  </div>
+</div>
+
+<!-- Legend -->
+<div id="legend">
+  <h4>Node Types</h4>
+  <div id="node-legend"></div>
+  <h4 style="margin-top: 10px;">Edge Types</h4>
+  <div id="edge-legend"></div>
+  <h4 style="margin-top: 10px;">Special</h4>
+  <div class="legend-item"><span class="color-dot" style="border: 2px solid #fff; background: transparent;"></span> Sitting member</div>
+  <div class="legend-item"><span class="color-dot" style="border: 2px solid #fff; background: transparent; animation: pulse 2s infinite;"></span> Bridge node</div>
+</div>
+
+<!-- Stats Panel -->
+<div id="stats-panel">
+  <h4>Network Statistics</h4>
+  <div id="stats-content"></div>
+</div>
+
+<!-- Side Panel -->
+<div id="side-panel">
+  <button class="sp-close" onclick="closeSidePanel()">&times;</button>
+  <div id="sp-body"></div>
+</div>
+
+<style>
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.6); }
+  50% { box-shadow: 0 0 0 4px rgba(255,255,255,0); }
+}
+</style>
+
+<script>
+// ============================================================
+// DATA — embedded from edges.csv
+// ============================================================
+const EDGES_RAW = [
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Thom Tillis","node_b_type":"senator","relationship_type":"disaster_response","period":"2017-2024","evidence":"Matthew/Florence/Helene requests; named meeting Nov 2024","source_url":"https://governor.nc.gov/news/press-releases/2024/11/20/...","influence_score":"","candidate_network":"Cooper","is_sitting_member":"True","is_nc_delegation":"True","relationship_detail":"disaster_aid_coordination"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Ted Budd","node_b_type":"senator","relationship_type":"disaster_response","period":"2017-2024","evidence":"Matthew/Florence/Helene requests; named meeting Nov 2024","source_url":"https://governor.nc.gov/news/press-releases/2024/11/20/...","influence_score":"","candidate_network":"Cooper","is_sitting_member":"True","is_nc_delegation":"True","relationship_detail":"disaster_aid_coordination"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Chuck Edwards","node_b_type":"representative","relationship_type":"disaster_response","period":"2024","evidence":"Named Helene meeting; Edwards is Vice Chair House Approps State/Foreign Ops","source_url":"https://governor.nc.gov/news/press-releases/2024/11/20/...","influence_score":"","candidate_network":"Cooper","is_sitting_member":"True","is_nc_delegation":"True","relationship_detail":"disaster_aid_coordination"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Deborah Ross","node_b_type":"representative","relationship_type":"legislative/governing","period":"2023-2024","evidence":"S-Line event; NASA/Koch event; Biden-Cooper Helene survey","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"True","is_nc_delegation":"True","relationship_detail":"federal_initiatives"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Valerie Foushee","node_b_type":"representative","relationship_type":"legislative/governing","period":"2022","evidence":"VinFast and Wolfspeed announcements","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"True","is_nc_delegation":"True","relationship_detail":"economic_development"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Virginia Foxx","node_b_type":"representative","relationship_type":"disaster_response","period":"2017-2018","evidence":"Matthew and Florence requests","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"True","is_nc_delegation":"True","relationship_detail":"delegation_disaster_aid"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"David Rouzer","node_b_type":"representative","relationship_type":"disaster_response","period":"2017-2018","evidence":"Matthew and Florence requests","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"True","is_nc_delegation":"True","relationship_detail":"delegation_disaster_aid"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Richard Hudson","node_b_type":"representative","relationship_type":"disaster_response","period":"2017-2018","evidence":"Matthew and Florence requests","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"True","is_nc_delegation":"True","relationship_detail":"delegation_disaster_aid"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Alma Adams","node_b_type":"representative","relationship_type":"disaster_response","period":"2017-2018","evidence":"Matthew and Florence requests","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"True","is_nc_delegation":"True","relationship_detail":"delegation_disaster_aid"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Tim Moore","node_b_type":"representative","relationship_type":"legislative/governing","period":"2017-2024","evidence":"Matthew recovery; Medicaid expansion; sustained institutional conflict","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"True","is_nc_delegation":"True","relationship_detail":"legislated_together/adversarial"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Phil Berger","node_b_type":"state_official","relationship_type":"legislative/governing","period":"2017-2024","evidence":"Matthew recovery; Medicaid expansion bargain/signing","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"legislated_together/adversarial"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"DSCC","node_b_type":"party_org","relationship_type":"campaign/endorsement","period":"2025-2026","evidence":"Schumer/Gillibrand welcome statement; 2026 race statement","source_url":"https://www.dscc.org/article/...","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"recruitment/campaign_support"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Chuck Schumer","node_b_type":"senator","relationship_type":"campaign/endorsement","period":"2025","evidence":"Joined DSCC statement praising Coopers entry","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"True","is_nc_delegation":"False","relationship_detail":"recruitment/campaign_support"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Kirsten Gillibrand","node_b_type":"senator","relationship_type":"campaign/endorsement","period":"2025-2026","evidence":"DSCC chair publicly welcomed Cooper","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"True","is_nc_delegation":"False","relationship_detail":"recruitment/campaign_support"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"DGA","node_b_type":"party_org","relationship_type":"campaign/endorsement","period":"2021-2022","evidence":"Chosen DGA chair for 2022","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"party_leadership"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Joe Biden","node_b_type":"admin_official","relationship_type":"legislative/governing","period":"2021-2024","evidence":"Broadband funding; Helene survey; Helene funding meeting","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"federal_state_initiatives"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Kamala Harris","node_b_type":"admin_official","relationship_type":"professional","period":"2024","evidence":"Durham federal-funding event; VP search (withdrew)","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"worked_together/VP_consideration"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Pete Buttigieg","node_b_type":"admin_official","relationship_type":"legislative/governing","period":"2023-2024","evidence":"Two S-Line events","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"infrastructure"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"AFGE","node_b_type":"party_org","relationship_type":"campaign/endorsement","period":"2026","evidence":"Senate endorsement Feb 2026","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"endorsement"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Fumio Kishida","node_b_type":"diplomat","relationship_type":"business_recruitment","period":"2024","evidence":"State lunch; Toyota and HondaJet visits","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"foreign_engagement/state_visit"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Rahm Emanuel","node_b_type":"diplomat","relationship_type":"business_recruitment","period":"2023-2024","evidence":"Tokyo meeting; Kishida NC visit","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"economic_diplomacy"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Akio Toyoda (Toyota)","node_b_type":"business","relationship_type":"business_recruitment","period":"2023","evidence":"Toyota chairman meeting","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"business_recruitment"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Koji Sato (Toyota)","node_b_type":"business","relationship_type":"business_recruitment","period":"2023","evidence":"Toyota president meeting; NC investment announcement","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"business_recruitment"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"FUJIFILM (Teiichi Goto)","node_b_type":"business","relationship_type":"business_recruitment","period":"2023","evidence":"Meeting on NC facilities","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"business_recruitment"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Shigeo Yamada","node_b_type":"diplomat","relationship_type":"business_recruitment","period":"2024","evidence":"Hosted Japanese ambassador at SEUS/Japan","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"diplomatic_engagement"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Schneider Electric","node_b_type":"business","relationship_type":"business_recruitment","period":"2024","evidence":"France meeting","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"business_recruitment"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Siemens AG","node_b_type":"business","relationship_type":"business_recruitment","period":"2024","evidence":"Germany meeting","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"business_recruitment"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"Novartis","node_b_type":"business","relationship_type":"business_recruitment","period":"2024","evidence":"Switzerland meeting","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"business_recruitment"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"FHI 360","node_b_type":"nonprofit","relationship_type":"professional","period":"2017-2024","evidence":"Durham-based; 144 NC layoffs from USAID cuts; 67% USAID funding","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"contextual_nc_employer"},
+  {"node_a":"Roy Cooper","node_a_type":"candidate","node_b":"RTI International","node_b_type":"nonprofit","relationship_type":"professional","period":"2017-2024","evidence":"RTP-based; 525+ NC layoffs from USAID cuts","source_url":"","influence_score":"","candidate_network":"Cooper","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"contextual_nc_employer"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"Donald Trump","node_b_type":"admin_official","relationship_type":"campaign/endorsement","period":"2016-present","evidence":"Longstanding relationship; Trump backed RNC chair and Senate run","source_url":"https://www.washingtonpost.com/politics/2024/02/13/...","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"political_sponsor/adviser"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"RNC","node_b_type":"party_org","relationship_type":"legislative/governing","period":"2024-2025","evidence":"Elected Mar 2024, reelected Jan 2025, left Aug 2025","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"chair"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"Lara Trump","node_b_type":"party_org","relationship_type":"campaign/endorsement","period":"2024","evidence":"Trumps paired RNC leadership team","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"RNC_co_leadership"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"Russ Vought (OMB)","node_b_type":"admin_official","relationship_type":"legislative/governing","period":"2024","evidence":"RNC named Vought policy director of 2024 platform committee","source_url":"https://gop.com/press-release/...","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"platform_leadership"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"Susie Wiles","node_b_type":"admin_official","relationship_type":"campaign/endorsement","period":"2016-present","evidence":"Became friendly while advising Trumps NC strategy","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"campaign_relationship"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"Marco Rubio (State)","node_b_type":"admin_official","relationship_type":"professional","period":"2024-present","evidence":"Party-level proximity through RNC; direct personal edge UNVERIFIED","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"organizational_proximity"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"John Thune","node_b_type":"senator","relationship_type":"campaign/endorsement","period":"2025-present","evidence":"Formal endorsement Jul 2025","source_url":"https://www.nrsc.org/press-releases/...","influence_score":"","candidate_network":"Whatley","is_sitting_member":"True","is_nc_delegation":"False","relationship_detail":"endorsement"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"Tim Scott (NRSC)","node_b_type":"senator","relationship_type":"campaign/endorsement","period":"2025-present","evidence":"NRSC chair endorsed; sits on Senate Foreign Relations","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"True","is_nc_delegation":"False","relationship_detail":"NRSC_endorsement"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"JD Vance","node_b_type":"admin_official","relationship_type":"campaign/endorsement","period":"2026","evidence":"Joint Hendersonville rally Oct 2026","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"True","is_nc_delegation":"False","relationship_detail":"endorser/surrogate"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"George W. Bush","node_b_type":"admin_official","relationship_type":"professional","period":"2000-2003","evidence":"Florida recount legal team; DOE principal deputy asst secretary","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"recount_team/DOE_service"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"Elizabeth Dole","node_b_type":"senator","relationship_type":"professional","period":"2004-2005","evidence":"Senate chief of staff; Dole was former Red Cross president","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"chief_of_staff"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"David Rouzer","node_b_type":"representative","relationship_type":"professional","period":"2004-2005","evidence":"Rouzer was senior adviser while Whatley was chief of staff","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"True","is_nc_delegation":"True","relationship_detail":"Dole_office_overlap"},
+  {"node_a":"George W. Bush","node_a_type":"admin_official","node_b":"Bush Center","node_b_type":"nonprofit","relationship_type":"professional","period":"2001-present","evidence":"Bush Center strongly defended PEPFAR and foreign aid in 2025","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"institutional"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"Ted Budd","node_b_type":"senator","relationship_type":"campaign/endorsement","period":"2025-2026","evidence":"Post-primary endorsement","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"True","is_nc_delegation":"True","relationship_detail":"endorsement"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"Thom Tillis","node_b_type":"senator","relationship_type":"campaign/endorsement","period":"2025-2026","evidence":"Endorsement but publicly questioned heavy spending on race","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"True","is_nc_delegation":"True","relationship_detail":"endorsement/tension"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"HBW Resources","node_b_type":"business","relationship_type":"lobbying/client","period":"2007-2022","evidence":"Oil and gas lobbying/consulting firm","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"founder/partner"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"Consumer Energy Alliance","node_b_type":"business","relationship_type":"lobbying/client","period":"2008-2019","evidence":"Named lobbyist in LDA filings","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"executive/lobbyist"},
+  {"node_a":"HBW Resources","node_a_type":"business","node_b":"American Petroleum Institute","node_b_type":"business","relationship_type":"lobbying/client","period":"2009","evidence":"LDA registration","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"client"},
+  {"node_a":"HBW Resources","node_a_type":"business","node_b":"Noble Energy","node_b_type":"business","relationship_type":"lobbying/client","period":"2014","evidence":"LDA filing","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"client"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"DOE SEAB","node_b_type":"admin_official","relationship_type":"legislative/governing","period":"2020","evidence":"Secretary of Energy Advisory Board","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"board_member"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"St. Mark's Episcopal, Gastonia","node_b_type":"faith_org","relationship_type":"faith/civic","period":"pre-2023","evidence":"Treasurer, former vestry and senior warden","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"church_leadership"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"Samaritan's Purse","node_b_type":"nonprofit","relationship_type":"disaster_response","period":"2024-2025","evidence":"Campaign says worked with SP after Helene; independently UNVERIFIED","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"claimed_Helene_cooperation"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"Senate Leadership Fund","node_b_type":"pac_superpac","relationship_type":"donor/financial","period":"2026","evidence":">$30M supporting Whatley","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"independent_expenditure"},
+  {"node_a":"Elon Musk","node_a_type":"business","node_b":"Senate Leadership Fund","node_b_type":"pac_superpac","relationship_type":"donor/financial","period":"2026","evidence":"$168M to SLF (two-hop, not direct)","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"donor"},
+  {"node_a":"Michael Whatley","node_a_type":"candidate","node_b":"NC Republican Party","node_b_type":"party_org","relationship_type":"legislative/governing","period":"2019-2024","evidence":"State party chairman","source_url":"","influence_score":"","candidate_network":"Whatley","is_sitting_member":"False","is_nc_delegation":"False","relationship_detail":"chair"}
+];
+
+// ============================================================
+// COLOR MAPS
+// ============================================================
+const NODE_TYPE_COLORS = {
+  candidate: '#999',        // overridden per-candidate below
+  senator: '#22d3ee',
+  representative: '#22d3ee',
+  state_official: '#94a3b8',
+  party_org: '#a855f7',
+  admin_official: '#f97316',
+  business: '#10b981',
+  diplomat: '#eab308',
+  nonprofit: '#ec4899',
+  faith_org: '#a16207',
+  pac_superpac: '#78716c'
+};
+
+const CANDIDATE_COLORS = {
+  'Roy Cooper': '#3b82f6',
+  'Michael Whatley': '#ef4444'
+};
+
+const REL_TYPE_COLORS = {
+  'professional': '#94a3b8',
+  'legislative/governing': '#22d3ee',
+  'campaign/endorsement': '#a855f7',
+  'disaster_response': '#f97316',
+  'business_recruitment': '#10b981',
+  'lobbying/client': '#78716c',
+  'donor/financial': '#eab308',
+  'faith/civic': '#a16207'
+};
+
+const REL_TYPE_LABELS = {
+  'professional': 'Professional',
+  'legislative/governing': 'Legislative / Governing',
+  'campaign/endorsement': 'Campaign / Endorsement',
+  'disaster_response': 'Disaster Response',
+  'business_recruitment': 'Business Recruitment',
+  'lobbying/client': 'Lobbying / Client',
+  'donor/financial': 'Donor / Financial',
+  'faith/civic': 'Faith / Civic'
+};
+
+const NODE_TYPE_LABELS = {
+  candidate: 'Candidate',
+  senator: 'Senator',
+  representative: 'Representative',
+  state_official: 'State Official',
+  party_org: 'Party Org',
+  admin_official: 'Admin Official',
+  business: 'Business',
+  diplomat: 'Diplomat',
+  nonprofit: 'Nonprofit',
+  faith_org: 'Faith Org',
+  pac_superpac: 'PAC / Super PAC'
+};
+
+// ============================================================
+// BUILD GRAPH DATA
+// ============================================================
+const nodeMap = {};
+const edgeList = [];
+const bridgeNodes = new Set();
+
+// Collect all nodes
+EDGES_RAW.forEach(e => {
+  const addNode = (name, type) => {
+    if (!nodeMap[name]) {
+      nodeMap[name] = { id: name, type: type, degree: 0, networks: new Set(), isSitting: false, edges: [] };
+    }
+    nodeMap[name].networks.add(e.candidate_network);
+    if (e.is_sitting_member === 'True') nodeMap[name].isSitting = true;
+  };
+  addNode(e.node_a, e.node_a_type);
+  addNode(e.node_b, e.node_b_type);
+});
+
+// Build edges
+EDGES_RAW.forEach((e, i) => {
+  nodeMap[e.node_a].degree++;
+  nodeMap[e.node_b].degree++;
+  nodeMap[e.node_a].edges.push(e);
+  nodeMap[e.node_b].edges.push(e);
+  edgeList.push({
+    source: e.node_a,
+    target: e.node_b,
+    relationship_type: e.relationship_type,
+    relationship_detail: e.relationship_detail,
+    period: e.period,
+    evidence: e.evidence,
+    source_url: e.source_url,
+    candidate_network: e.candidate_network,
+    is_sitting_member: e.is_sitting_member,
+    idx: i
+  });
+});
+
+// Identify bridge nodes
+Object.values(nodeMap).forEach(n => {
+  if (n.networks.has('Cooper') && n.networks.has('Whatley')) {
+    bridgeNodes.add(n.id);
+  }
+  n.isBridge = bridgeNodes.has(n.id);
+});
+
+// Handle multi-edges between same pair: assign curvature
+const pairCount = {};
+edgeList.forEach(e => {
+  const key = [e.source, e.target].sort().join('|||');
+  pairCount[key] = (pairCount[key] || 0) + 1;
+});
+const pairIdx = {};
+edgeList.forEach(e => {
+  const key = [e.source, e.target].sort().join('|||');
+  pairIdx[key] = (pairIdx[key] || 0) + 1;
+  const total = pairCount[key];
+  if (total > 1) {
+    e.curvature = 0.15 + (pairIdx[key] - 1) * 0.15;
+  } else {
+    e.curvature = 0.2;
+  }
+});
+
+function getNodeColor(node) {
+  if (CANDIDATE_COLORS[node.id]) return CANDIDATE_COLORS[node.id];
+  return NODE_TYPE_COLORS[node.type] || '#94a3b8';
+}
+
+function getNodeSize(node) {
+  if (node.type === 'candidate') return 12;
+  return 3 + Math.min(node.degree * 1.5, 8);
+}
+
+// ============================================================
+// BUILD GRAPH
+// ============================================================
+const allNodes = Object.values(nodeMap);
+let graphData = { nodes: allNodes, links: edgeList };
+
+let currentMode = '3d';
+let graph;
+
+function initGraph() {
+  const container = document.getElementById('graph-container');
+  container.innerHTML = '';
+
+  graph = ForceGraph3D()(container)
+    .graphData(JSON.parse(JSON.stringify(graphData)))
+    .backgroundColor('#0a0e27')
+    .nodeLabel(() => '')
+    .nodeVal(n => getNodeSize(n))
+    .nodeColor(n => getNodeColor(n))
+    .nodeOpacity(1)
+    .nodeResolution(16)
+    .linkColor(l => {
+      const c = REL_TYPE_COLORS[l.relationship_type] || '#94a3b8';
+      return c + '66'; // alpha
+    })
+    .linkWidth(1.2)
+    .linkCurvature(l => l.curvature || 0.2)
+    .linkOpacity(0.4)
+    .linkDirectionalParticles(0)
+    .d3AlphaDecay(0.02)
+    .d3VelocityDecay(0.3)
+    .warmupTicks(80)
+    .cooldownTicks(200)
+    .onNodeHover(handleNodeHover)
+    .onNodeClick(handleNodeClick)
+    .nodeThreeObject(n => {
+      const group = new THREE.Group();
+      const color = getNodeColor(n);
+      const size = getNodeSize(n);
+
+      // Main sphere
+      const geometry = new THREE.SphereGeometry(size, 16, 16);
+      const material = new THREE.MeshPhongMaterial({
+        color: new THREE.Color(color),
+        emissive: new THREE.Color(color),
+        emissiveIntensity: 0.4,
+        transparent: true,
+        opacity: 0.9
+      });
+      const sphere = new THREE.Mesh(geometry, material);
+      group.add(sphere);
+
+      // Glow for candidates
+      if (n.type === 'candidate') {
+        const glowGeom = new THREE.SphereGeometry(size * 1.6, 16, 16);
+        const glowMat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(color),
+          transparent: true,
+          opacity: 0.15
+        });
+        const glow = new THREE.Mesh(glowGeom, glowMat);
+        group.add(glow);
+      }
+
+      // Sitting member ring
+      if (n.isSitting && n.type !== 'candidate') {
+        const ringGeom = new THREE.RingGeometry(size * 1.3, size * 1.5, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.7,
+          side: THREE.DoubleSide
+        });
+        const ring = new THREE.Mesh(ringGeom, ringMat);
+        group.add(ring);
+      }
+
+      // Bridge node ring
+      if (n.isBridge && n.type !== 'candidate') {
+        const ringGeom = new THREE.RingGeometry(size * 1.6, size * 1.8, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.5,
+          side: THREE.DoubleSide
+        });
+        const ring = new THREE.Mesh(ringGeom, ringMat);
+        group.add(ring);
+      }
+
+      // Label sprite
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 256;
+      canvas.height = 64;
+      ctx.fillStyle = 'rgba(0,0,0,0)';
+      ctx.fillRect(0, 0, 256, 64);
+      ctx.font = '600 24px Inter, sans-serif';
+      ctx.fillStyle = '#e2e8f0';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      // Truncate long names
+      let label = n.id;
+      if (label.length > 20) label = label.substring(0, 18) + '...';
+      ctx.fillText(label, 128, 32);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const spriteMat = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 0.85
+      });
+      const sprite = new THREE.Sprite(spriteMat);
+      sprite.scale.set(size * 4, size * 1, 1);
+      sprite.position.set(0, size * 1.8, 0);
+      group.add(sprite);
+
+      return group;
+    });
+
+  // Add ambient light
+  const scene = graph.scene();
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambientLight);
+  const pointLight = new THREE.PointLight(0xffffff, 0.8, 1000);
+  pointLight.position.set(200, 200, 200);
+  scene.add(pointLight);
+
+  applyFilters();
+}
+
+// ============================================================
+// TOOLTIP
+// ============================================================
+function handleNodeHover(node, prevNode) {
+  const tooltip = document.getElementById('tooltip');
+  if (!node) {
+    tooltip.style.display = 'none';
+    document.body.style.cursor = 'default';
+    return;
+  }
+  document.body.style.cursor = 'pointer';
+  tooltip.style.display = 'block';
+
+  const color = getNodeColor(node);
+  let infoHtml = '';
+  if (node.isBridge) infoHtml += '<div class="tt-info" style="color:#fbbf24">Bridge node (both networks)</div>';
+  if (node.isSitting) infoHtml += '<div class="tt-info">Sitting member</div>';
+  infoHtml += `<div class="tt-info">Connections: ${node.degree}</div>`;
+
+  tooltip.innerHTML = `
+    <div class="tt-name" style="color:${color}">${node.id}</div>
+    <div class="tt-type">${NODE_TYPE_LABELS[node.type] || node.type}</div>
+    ${infoHtml}
+  `;
+
+  // Position near mouse
+  const evt = graph.renderer().domElement;
+  document.addEventListener('mousemove', positionTooltip);
+}
+
+function positionTooltip(e) {
+  const tooltip = document.getElementById('tooltip');
+  if (tooltip.style.display === 'none') return;
+  let x = e.clientX + 16;
+  let y = e.clientY + 16;
+  if (x + 280 > window.innerWidth) x = e.clientX - 290;
+  if (y + 150 > window.innerHeight) y = e.clientY - 160;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top = y + 'px';
+}
+
+// ============================================================
+// SIDE PANEL
+// ============================================================
+function handleNodeClick(node) {
+  if (!node) return;
+  const panel = document.getElementById('side-panel');
+  const body = document.getElementById('sp-body');
+  const color = getNodeColor(node);
+  const nodeData = nodeMap[node.id];
+
+  let edgesHtml = '';
+  nodeData.edges.forEach(e => {
+    const other = e.node_a === node.id ? e.node_b : e.node_a;
+    const relColor = REL_TYPE_COLORS[e.relationship_type] || '#94a3b8';
+    edgesHtml += `
+      <div class="sp-edge">
+        <div class="sp-edge-target">${other}</div>
+        <div class="sp-edge-cat" style="color:${relColor}">${REL_TYPE_LABELS[e.relationship_type] || e.relationship_type}</div>
+        <div class="sp-edge-detail">${e.relationship_detail || ''}</div>
+        <div class="sp-edge-period">Period: ${e.period || 'N/A'}</div>
+        ${e.evidence ? `<div class="sp-edge-evidence">"${e.evidence}"</div>` : ''}
+        ${e.source_url ? `<div class="sp-edge-link"><a href="${e.source_url}" target="_blank" rel="noopener">Source</a></div>` : ''}
+      </div>
+    `;
+  });
+
+  let badges = '';
+  if (nodeData.isSitting) badges += '<span style="background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:4px;font-size:11px;margin-right:4px;">Sitting Member</span>';
+  if (nodeData.isBridge) badges += '<span style="background:rgba(251,191,36,0.2);color:#fbbf24;padding:2px 8px;border-radius:4px;font-size:11px;">Bridge Node</span>';
+  const networkList = Array.from(nodeData.networks).join(', ');
+
+  body.innerHTML = `
+    <div class="sp-name" style="color:${color}">${node.id}</div>
+    <div class="sp-type">${NODE_TYPE_LABELS[node.type] || node.type}</div>
+    <div style="margin-bottom:12px">${badges}</div>
+    <div style="font-size:12px;color:#94a3b8;margin-bottom:16px">Networks: ${networkList} | Connections: ${nodeData.degree}</div>
+    <h4 style="font-size:13px;font-weight:700;margin-bottom:10px;color:#f1f5f9">Relationships (${nodeData.edges.length})</h4>
+    ${edgesHtml}
+  `;
+
+  panel.classList.add('open');
+}
+
+function closeSidePanel() {
+  document.getElementById('side-panel').classList.remove('open');
+}
+
+// ============================================================
+// FILTERS
+// ============================================================
+function applyFilters() {
+  const showCooper = document.getElementById('f-cooper').checked;
+  const showWhatley = document.getElementById('f-whatley').checked;
+  const sittingOnly = document.getElementById('f-sitting').checked;
+  const bridgeOnly = document.getElementById('f-bridge').checked;
+
+  // Get checked relationship types
+  const checkedRelTypes = new Set();
+  document.querySelectorAll('#rel-type-filters input[type=checkbox]').forEach(cb => {
+    if (cb.checked) checkedRelTypes.add(cb.dataset.val);
+  });
+
+  // Get checked node types
+  const checkedNodeTypes = new Set();
+  document.querySelectorAll('#node-type-filters input[type=checkbox]').forEach(cb => {
+    if (cb.checked) checkedNodeTypes.add(cb.dataset.val);
+  });
+
+  // Filter edges
+  const filteredEdges = edgeList.filter(e => {
+    // Network filter
+    if (!showCooper && e.candidate_network === 'Cooper') return false;
+    if (!showWhatley && e.candidate_network === 'Whatley') return false;
+    // Relationship type filter
+    if (!checkedRelTypes.has(e.relationship_type)) return false;
+    return true;
+  });
+
+  // Get nodes referenced by filtered edges
+  const activeNodeIds = new Set();
+  filteredEdges.forEach(e => {
+    const srcId = typeof e.source === 'object' ? e.source.id : e.source;
+    const tgtId = typeof e.target === 'object' ? e.target.id : e.target;
+    activeNodeIds.add(srcId);
+    activeNodeIds.add(tgtId);
+  });
+
+  // Filter nodes
+  const filteredNodes = allNodes.filter(n => {
+    if (!activeNodeIds.has(n.id)) return false;
+    if (!checkedNodeTypes.has(n.type)) return false;
+    if (sittingOnly && !n.isSitting) return false;
+    if (bridgeOnly && !n.isBridge) return false;
+    return true;
+  });
+
+  // Further filter edges to only include edges where both endpoints are visible
+  const visibleNodeIds = new Set(filteredNodes.map(n => n.id));
+  const finalEdges = filteredEdges.filter(e => {
+    const srcId = typeof e.source === 'object' ? e.source.id : e.source;
+    const tgtId = typeof e.target === 'object' ? e.target.id : e.target;
+    return visibleNodeIds.has(srcId) && visibleNodeIds.has(tgtId);
+  });
+
+  graph.graphData({
+    nodes: filteredNodes,
+    links: finalEdges
+  });
+
+  updateStats(filteredNodes, finalEdges);
+}
+
+// ============================================================
+// SEARCH
+// ============================================================
+function onSearch(query) {
+  const resultsDiv = document.getElementById('search-results');
+  if (!query.trim()) {
+    resultsDiv.innerHTML = '';
+    return;
+  }
+  const q = query.toLowerCase();
+  const matches = allNodes.filter(n => n.id.toLowerCase().includes(q)).slice(0, 8);
+  resultsDiv.innerHTML = matches.map(n => {
+    const color = getNodeColor(n);
+    return `<div class="search-result" onclick="flyToNode('${n.id.replace(/'/g, "\\'")}')" style="color:${color}">${n.id} <span style="color:#64748b;font-size:10px">${n.type}</span></div>`;
+  }).join('');
+}
+
+function flyToNode(nodeId) {
+  const node = graph.graphData().nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  const distance = 120;
+  const distRatio = 1 + distance / Math.hypot(node.x || 0, node.y || 0, node.z || 0);
+  graph.cameraPosition(
+    { x: (node.x || 0) * distRatio, y: (node.y || 0) * distRatio, z: (node.z || 0) * distRatio },
+    { x: node.x || 0, y: node.y || 0, z: node.z || 0 },
+    1500
+  );
+  document.getElementById('search-results').innerHTML = '';
+  document.getElementById('search-box').value = '';
+  // Trigger click on the node
+  setTimeout(() => handleNodeClick(node), 1600);
+}
+
+// ============================================================
+// STATS
+// ============================================================
+function updateStats(nodes, edges) {
+  const container = document.getElementById('stats-content');
+  const cooperEdges = edges.filter(e => e.candidate_network === 'Cooper');
+  const whatleyEdges = edges.filter(e => e.candidate_network === 'Whatley');
+
+  // Category breakdown
+  const catCountCooper = {};
+  const catCountWhatley = {};
+  cooperEdges.forEach(e => { catCountCooper[e.relationship_type] = (catCountCooper[e.relationship_type] || 0) + 1; });
+  whatleyEdges.forEach(e => { catCountWhatley[e.relationship_type] = (catCountWhatley[e.relationship_type] || 0) + 1; });
+
+  let catHtml = '';
+  Object.keys(REL_TYPE_COLORS).forEach(rt => {
+    const cc = catCountCooper[rt] || 0;
+    const wc = catCountWhatley[rt] || 0;
+    if (cc + wc > 0) {
+      catHtml += `<div class="stat-row stat-sub"><span class="stat-label" style="color:${REL_TYPE_COLORS[rt]}">${REL_TYPE_LABELS[rt] || rt}</span><span class="stat-value">${cc}C / ${wc}W</span></div>`;
+    }
+  });
+
+  container.innerHTML = `
+    <div class="stat-row"><span class="stat-label">Visible nodes</span><span class="stat-value">${nodes.length}</span></div>
+    <div class="stat-row"><span class="stat-label">Visible edges</span><span class="stat-value">${edges.length}</span></div>
+    <div class="stat-row"><span class="stat-label" style="color:#3b82f6">Cooper edges</span><span class="stat-value">${cooperEdges.length}</span></div>
+    <div class="stat-row"><span class="stat-label" style="color:#ef4444">Whatley edges</span><span class="stat-value">${whatleyEdges.length}</span></div>
+    <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(100,116,139,0.15)">
+      <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:4px">BY CATEGORY (C/W)</div>
+      ${catHtml}
+    </div>
+  `;
+}
+
+// ============================================================
+// VIEW TOGGLE
+// ============================================================
+function setView(mode) {
+  currentMode = mode;
+  document.getElementById('btn-3d').classList.toggle('active', mode === '3d');
+  document.getElementById('btn-2d').classList.toggle('active', mode === '2d');
+
+  if (mode === '2d') {
+    graph.numDimensions(2);
+    // Move camera to top-down
+    graph.cameraPosition({ x: 0, y: 0, z: 600 }, { x: 0, y: 0, z: 0 }, 1000);
+  } else {
+    graph.numDimensions(3);
+    graph.cameraPosition({ x: 0, y: 0, z: 400 }, { x: 0, y: 0, z: 0 }, 1000);
+  }
+}
+
+// ============================================================
+// EXPORT PNG
+// ============================================================
+function exportPNG() {
+  const renderer = graph.renderer();
+  renderer.render(graph.scene(), graph.camera());
+  const dataUrl = renderer.domElement.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = 'nc_senate_2026_network.png';
+  a.click();
+}
+
+// ============================================================
+// BUILD FILTER UI
+// ============================================================
+function buildFilters() {
+  // Relationship type checkboxes
+  const relDiv = document.getElementById('rel-type-filters');
+  Object.keys(REL_TYPE_COLORS).forEach(rt => {
+    const color = REL_TYPE_COLORS[rt];
+    relDiv.innerHTML += `
+      <div class="filter-row">
+        <input type="checkbox" checked data-val="${rt}" onchange="applyFilters()">
+        <span class="color-dot" style="background:${color}"></span>
+        <span>${REL_TYPE_LABELS[rt] || rt}</span>
+      </div>
+    `;
+  });
+
+  // Node type checkboxes
+  const nodeDiv = document.getElementById('node-type-filters');
+  Object.keys(NODE_TYPE_COLORS).forEach(nt => {
+    const color = nt === 'candidate' ? '#888' : NODE_TYPE_COLORS[nt];
+    nodeDiv.innerHTML += `
+      <div class="filter-row">
+        <input type="checkbox" checked data-val="${nt}" onchange="applyFilters()">
+        <span class="color-dot" style="background:${color}"></span>
+        <span>${NODE_TYPE_LABELS[nt] || nt}</span>
+      </div>
+    `;
+  });
+
+  // Node legend
+  const nodeLegend = document.getElementById('node-legend');
+  nodeLegend.innerHTML += `<div class="legend-item"><span class="color-dot" style="background:#3b82f6;box-shadow:0 0 6px #3b82f6"></span> Cooper (candidate)</div>`;
+  nodeLegend.innerHTML += `<div class="legend-item"><span class="color-dot" style="background:#ef4444;box-shadow:0 0 6px #ef4444"></span> Whatley (candidate)</div>`;
+  Object.keys(NODE_TYPE_COLORS).forEach(nt => {
+    if (nt === 'candidate') return;
+    nodeLegend.innerHTML += `<div class="legend-item"><span class="color-dot" style="background:${NODE_TYPE_COLORS[nt]}"></span> ${NODE_TYPE_LABELS[nt]}</div>`;
+  });
+
+  // Edge legend
+  const edgeLegend = document.getElementById('edge-legend');
+  Object.keys(REL_TYPE_COLORS).forEach(rt => {
+    edgeLegend.innerHTML += `<div class="legend-item"><span class="legend-line" style="background:${REL_TYPE_COLORS[rt]}"></span> ${REL_TYPE_LABELS[rt]}</div>`;
+  });
+}
+
+// ============================================================
+// INIT
+// ============================================================
+buildFilters();
+initGraph();
+</script>
+</body>
+</html>
