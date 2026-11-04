@@ -11,9 +11,9 @@ Interactive map of Senator-elect Roy Cooper's 48 documented political relationsh
 
 ## Data
 
-- **48 edges** connecting Roy Cooper to 38 people and organizations
+- **48 relationships** connecting Roy Cooper to 38 people and organizations
 - **6 allies** who oppose the 2025 foreign aid cuts
-- **11 persuadable bridges** — cross-party ties or members who supported cuts
+- **11 cross-party contacts** — Republican ties who supported cuts or have no record
 - Every relationship has a dated source URL
 - Data date: November 2026. Census trade data pulled 2026-10-26.
 

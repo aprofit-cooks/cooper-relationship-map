@@ -1,1404 +1,907 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Interactive network map of Roy Cooper's political relationships relevant to foreign aid advocacy.">
-<meta property="og:title" content="Roy Cooper's Relationship Network">
-<meta property="og:description" content="48 documented relationships — allies, persuadable bridges, and cross-party ties for CARE USA foreign aid advocacy.">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Roy Cooper: Relationship Map</title>
+<meta name="description" content="An interactive map of Roy Cooper’s documented relationships relevant to foreign aid advocacy, with a source for every connection.">
+<meta property="og:title" content="Roy Cooper: Relationship Map">
+<meta property="og:description" content="Documented relationships relevant to foreign aid advocacy. Every connection links to its source.">
 <meta property="og:type" content="website">
-<title>Roy Cooper's Relationship Network</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-/* =========================================================
-   BASE / RESET
-   ========================================================= */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { width: 100%; height: 100%; overflow: hidden; }
-body {
-  background: #0a0e27;
-  color: #e2e8f0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 14px;
+:root{
+  --bg:#000000; --ink:#E9EEF5; --muted:#8C97A8; --dim:#5A6474;
+  --rule:rgba(233,238,245,.13); --faint:rgba(233,238,245,.06);
+  --panel:rgba(4,6,10,.86); --panel-solid:#04060A;
+  --cooper:#4C8DFF; --whatley:#FF5468;
+  --display:'Chakra Petch', 'Rajdhani', 'Segoe UI', system-ui, sans-serif;
+  --body:'Manrope', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color-scheme:dark;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
 }
-/* Focus outlines for accessibility */
-:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#000000; --ink:#E9EEF5; --panel:rgba(4,6,10,.86); } }
+:root[data-theme="dark"]{ --bg:#000000; --ink:#E9EEF5; --panel:rgba(4,6,10,.86); }
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%; scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%; margin:0; background:var(--bg); color:var(--ink); font-family:var(--body); font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased; overflow:hidden}
+body::before{content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top,0px); z-index:10; background:var(--bg)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--ink); outline-offset:2px; border-radius:4px}
+button{font:inherit; color:inherit; background:none; border:0; cursor:pointer; padding:0}
 
-/* =========================================================
-   LAYOUT SHELL
-   ========================================================= */
-#app { position: relative; width: 100%; height: 100%; }
-#graph-container { position: absolute; inset: 0; }
+/* header */
+.top{position:fixed; top:0; left:0; right:0; z-index:5; display:flex; align-items:flex-end; justify-content:space-between; gap:24px;
+  padding:calc(18px + env(safe-area-inset-top,0px)) 24px 14px; background:linear-gradient(#000 55%, rgba(0,0,0,0)); pointer-events:none}
+.top > *{pointer-events:auto}
+.brand h1{font-family:var(--display); font-weight:600; font-size:22px; letter-spacing:.01em; margin:0; line-height:1.1}
+.brand h1 .c{color:var(--cooper)} .brand h1 .w{color:var(--whatley)}
+.brand p{margin:4px 0 0; color:var(--muted); font-size:13px}
+.tabs{display:flex; gap:22px}
+.tabs a{font-family:var(--display); font-weight:500; font-size:15px; text-decoration:none; color:var(--muted); padding:4px 0; border-bottom:2px solid transparent}
+.tabs a[aria-current="page"]{color:var(--ink); border-bottom-color:var(--ink)}
 
-/* =========================================================
-   TAB BAR
-   ========================================================= */
-#tab-bar {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 44px;
-  background: rgba(10,14,39,0.92);
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  z-index: 100;
-  gap: 4px;
-}
-.tab-btn {
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  cursor: pointer;
-  padding: 0 16px;
-  height: 36px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  transition: background 0.15s, color 0.15s;
-  min-width: 44px;
-}
-.tab-btn:hover { background: rgba(255,255,255,0.07); color: #e2e8f0; }
-.tab-btn.active { background: rgba(59,130,246,0.2); color: #60a5fa; }
+/* network view */
+#network-view{position:fixed; inset:0}
+canvas{display:block; width:100%; height:100%; cursor:grab; touch-action:none}
+canvas.hit{cursor:pointer}
+canvas:active{cursor:grabbing}
 
-/* hamburger – mobile only */
-#hamburger-btn {
-  display: none;
-  background: transparent;
-  border: none;
-  color: #e2e8f0;
-  cursor: pointer;
-  font-size: 20px;
-  width: 44px;
-  height: 44px;
-  align-items: center;
-  justify-content: center;
-  margin-left: auto;
-}
+.controls{position:absolute; left:20px; top:96px; background:var(--panel); border:1px solid var(--rule); border-radius:14px; padding:16px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); max-height:calc(100% - 150px); overflow:auto}
+.controls h2{font-family:var(--display); font-size:13px; font-weight:600; color:var(--muted); margin:16px 0 8px; letter-spacing:.02em}
+.controls h2:first-child{margin-top:0}
+.search{width:100%; background:#000; border:1px solid var(--rule); border-radius:9px; color:var(--ink); font:inherit; font-size:14px; padding:9px 11px}
+.search::placeholder{color:var(--dim)}
+.seg{display:grid; grid-template-columns:repeat(3,1fr); border:1px solid var(--rule); border-radius:9px; overflow:hidden}
+.seg button{padding:7px 0; font-size:13px; font-weight:600; color:var(--muted)}
+.seg button + button{border-left:1px solid var(--rule)}
+.seg button[aria-pressed="true"]{background:rgba(233,238,245,.1); color:var(--ink)}
+.seg button[data-net="Cooper"][aria-pressed="true"]{color:var(--cooper)}
+.seg button[data-net="Whatley"][aria-pressed="true"]{color:var(--whatley)}
+.legend{list-style:none; margin:0; padding:0; display:grid; gap:2px}
+.legend button{display:flex; align-items:center; gap:10px; width:100%; padding:6px 6px; border-radius:7px; font-size:13.5px; text-align:left}
+.legend button:hover{background:var(--faint)}
+.legend button[aria-pressed="false"]{opacity:.35}
+.dot{width:10px; height:10px; border-radius:50%; background:var(--c); box-shadow:0 0 10px var(--c); flex:none}
+.legend .n{margin-left:auto; color:var(--dim); font-variant-numeric:tabular-nums; font-size:12.5px}
+.care{display:flex; gap:10px; align-items:flex-start; font-size:13.5px; padding:8px; border:1px solid var(--rule); border-radius:9px; width:100%; text-align:left}
+.care .box{width:16px; height:16px; border:1.5px solid var(--muted); border-radius:4px; flex:none; margin-top:2px}
+.care[aria-pressed="true"]{border-color:var(--cooper)}
+.care[aria-pressed="true"] .box{background:var(--cooper); border-color:var(--cooper)}
+.keys{list-style:none; margin:0; padding:0; display:grid; gap:7px; font-size:12.5px; color:var(--muted)}
+.keys li{display:flex; gap:10px; align-items:center}
+.keys svg{flex:none}
+.toggle-filters{display:none}
+.controls{width:300px}
+.controls .note{font-size:12.5px; color:var(--muted); margin:-2px 0 8px}
+.list-h{display:flex; align-items:center; gap:8px; font-family:var(--display); font-size:12.5px; font-weight:600; color:var(--muted); margin:10px 0 4px}
+.list-h .ring{width:12px; height:12px; border-radius:50%; border:1.6px solid #4C8DFF}
+.list-h .ring.dashed{border:1.6px dashed #FFB547}
+.people{list-style:none; margin:0; padding:0; display:grid; gap:1px}
+.people button{display:grid; grid-template-columns:1fr auto; gap:2px 10px; width:100%; text-align:left; padding:6px 8px; border-radius:8px}
+.people button:hover, .people button:focus-visible{background:var(--faint)}
+.people .nm{font-size:13.5px; font-weight:600}
+.people .rl{font-size:11.5px; color:var(--muted); grid-column:1}
+.people .sc{grid-row:1 / span 2; grid-column:2; align-self:center; font-family:var(--display); font-weight:600; font-size:14px; color:var(--ink)}
+.fhead{display:flex; align-items:center; justify-content:space-between; margin-top:16px}
+.fhead h2{margin:0 !important}
+.reset{font-size:12.5px; font-weight:600; color:var(--ink); border:1px solid var(--rule); border-radius:7px; padding:4px 10px}
+.reset:hover{border-color:var(--ink)}
+.shown{font-size:12.5px; color:var(--muted); margin:6px 0 10px}
+.shown b{color:var(--ink)}
+.sub{font-family:var(--display); font-size:12.5px; font-weight:600; color:var(--muted); margin:14px 0 6px; display:flex; justify-content:space-between}
+.sub output{color:var(--ink)}
+.chipset{display:flex; flex-wrap:wrap; gap:6px}
+.chipset button{font-size:12.5px; padding:4px 10px; border-radius:999px; border:1px solid var(--rule); color:var(--ink)}
+.chipset button[aria-pressed="false"]{opacity:.38; text-decoration:line-through}
+.range{width:100%; accent-color:#4C8DFF}
+.keys-wrap{margin-top:14px; border-top:1px solid var(--rule); padding-top:10px}
+.keys-wrap summary{cursor:pointer; font-family:var(--display); font-size:13px; font-weight:600; color:var(--muted); margin-bottom:8px}
+.hint{position:absolute; top:96px; left:50%; transform:translateX(-50%); display:flex; gap:14px; align-items:center; background:var(--panel); border:1px solid var(--rule); border-radius:12px; padding:10px 12px 10px 16px; font-size:13.5px; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); max-width:min(560px, calc(100% - 40px))}
+.hint button{font-weight:600; font-size:13px; border:1px solid var(--rule); border-radius:8px; padding:5px 10px; white-space:nowrap}
+.hint[hidden], .empty[hidden]{display:none}
+.empty{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; background:var(--panel); border:1px solid var(--rule); border-radius:14px; padding:18px 22px}
+.empty p{margin:0 0 10px; color:var(--ink)}
+.empty button{font-weight:600; border:1px solid var(--ink); border-radius:8px; padding:6px 12px}
+.dl{font-size:13px; font-weight:600; border:1px solid var(--rule); border-radius:9px; padding:8px 12px; margin-left:auto}
+.dl:hover{border-color:var(--ink)}
+table.data th button{font:inherit; color:inherit; display:inline-flex; gap:4px; align-items:center}
+table.data th button[aria-sort] .arr{opacity:1}
+table.data th .arr{opacity:.35; font-size:11px}
 
-/* =========================================================
-   HINT BANNER
-   ========================================================= */
-#hint-banner {
-  position: absolute;
-  top: 50px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(30,41,59,0.95);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 12px;
-  color: #cbd5e1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  z-index: 90;
-  white-space: nowrap;
-  max-width: 90vw;
-  white-space: normal;
-  text-align: center;
-}
-#hint-banner button {
-  background: none;
-  border: none;
-  color: #94a3b8;
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  flex-shrink: 0;
-  padding: 2px 4px;
-  min-width: 24px;
-}
+.status{position:absolute; left:20px; bottom:calc(16px + env(safe-area-inset-bottom,0px)); font-size:12.5px; color:var(--muted); pointer-events:none}
+.status b{color:var(--ink); font-weight:600}
 
-/* =========================================================
-   3D/2D TOGGLE
-   ========================================================= */
-#dim-toggle {
-  position: absolute;
-  top: 54px;
-  right: 12px;
-  background: rgba(30,41,59,0.9);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px;
-  color: #e2e8f0;
-  cursor: pointer;
-  padding: 8px 14px;
-  font-size: 12px;
-  z-index: 90;
-  transition: background 0.15s;
-}
-#dim-toggle:hover { background: rgba(59,130,246,0.25); }
+/* side panel */
+aside.panel{position:absolute; top:96px; right:20px; bottom:calc(20px + env(safe-area-inset-bottom,0px)); width:392px; background:var(--panel); border:1px solid var(--rule); border-radius:16px; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  transform:translateX(calc(100% + 40px)); transition:transform .28s cubic-bezier(.2,.8,.2,1); display:flex; flex-direction:column; overflow:hidden}
+aside.panel.open{transform:none}
+.p-bar{display:flex; align-items:center; gap:10px; padding:14px 16px 0}
+.p-bar .grp{font-size:12.5px; color:var(--muted)}
+.p-bar .close{margin-left:auto; font-size:13px; color:var(--muted); padding:4px 8px; border:1px solid var(--rule); border-radius:7px}
+.p-bar .close:hover{color:var(--ink)}
+.p-body{overflow:auto; padding:6px 18px 22px}
+.p-body h2{font-family:var(--display); font-weight:600; font-size:26px; line-height:1.1; margin:8px 0 6px}
+.p-body .role{color:var(--muted); margin:0 0 10px; font-size:14px}
+.p-body .summary{font-size:15px; line-height:1.6; margin:12px 0 4px; max-width:60ch}
+.chips{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 6px}
+.chip{font-size:12px; padding:3px 9px; border-radius:999px; border:1px solid var(--rule); color:var(--ink)}
+.chip.ally{border-color:var(--cooper); color:#BFD5FF}
+.chip.bridge{border-color:#FFB547; color:#FFD9A0; border-style:dashed}
+.chip.adv{border-color:#FF8A5C; color:#FFC3A8}
+.p-body section{border-top:1px solid var(--rule); padding-top:12px; margin-top:14px}
+.p-body h3{font-family:var(--display); font-weight:600; font-size:13px; color:var(--muted); margin:0 0 8px; letter-spacing:.02em}
+.p-body p{margin:0 0 8px}
+.small{font-size:13px; color:var(--muted)}
+.src{display:inline-flex; gap:6px; align-items:center; font-size:13px; color:var(--ink); text-decoration:none; border-bottom:1px solid var(--rule); padding-bottom:1px}
+.src:hover{border-color:var(--ink)}
+.src svg{opacity:.7}
+.score{display:flex; align-items:baseline; gap:8px; margin-bottom:10px}
+.score b{font-family:var(--display); font-size:40px; font-weight:700; line-height:1}
+.score span{color:var(--muted); font-size:13px}
+.bars{display:grid; gap:7px}
+.bar{display:grid; grid-template-columns:118px 1fr 34px; align-items:center; gap:10px; font-size:12.5px; color:var(--muted)}
+.bar .track{display:block; height:6px; border-radius:3px; background:var(--faint); overflow:hidden}
+.bar .fill{display:block; height:100%; background:var(--c); border-radius:3px}
+.bar .v{text-align:right; color:var(--ink); font-variant-numeric:tabular-nums}
+.rels{list-style:none; margin:0; padding:0; display:grid; gap:12px}
+.rels li{border:1px solid var(--rule); border-radius:11px; padding:11px 12px; background:rgba(0,0,0,.35)}
+.rels .who{display:flex; align-items:center; gap:8px; font-weight:600; font-size:14.5px}
+.rels .who button{text-align:left; text-decoration:underline; text-decoration-color:var(--rule); text-underline-offset:3px}
+.rels .who button:hover{text-decoration-color:var(--ink)}
+.rels .meta{font-size:12.5px; color:var(--muted); margin:3px 0 6px}
+.rels .ev{font-size:13.5px; margin:0 0 7px}
+.cat-tally{display:grid; gap:6px}
 
-/* =========================================================
-   FILTERS PANEL
-   ========================================================= */
-#filters-panel {
-  position: absolute;
-  top: 50px;
-  left: 8px;
-  width: 240px;
-  background: rgba(10,14,39,0.95);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 10px;
-  padding: 12px;
-  z-index: 80;
-  max-height: calc(100vh - 70px);
-  overflow-y: auto;
-}
-.filters-section { margin-bottom: 14px; }
-.filters-section label.section-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #64748b;
-  margin-bottom: 6px;
-}
-.radio-group, .check-group { display: flex; flex-direction: column; gap: 4px; }
-.radio-group label, .check-group label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #cbd5e1;
-  min-height: 28px;
-}
-input[type="radio"], input[type="checkbox"] {
-  accent-color: #3b82f6;
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-}
-.chip-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.chip-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-  flex-shrink: 0;
-}
-/* slider */
-#score-slider {
-  width: 100%;
-  accent-color: #3b82f6;
-  margin-top: 4px;
-}
-#slider-val {
-  font-size: 11px;
-  color: #94a3b8;
-  margin-left: 4px;
-}
-/* search */
-#search-input {
-  width: 100%;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 6px;
-  color: #e2e8f0;
-  padding: 7px 10px;
-  font-size: 13px;
-  outline: none;
-}
-#search-input:focus { border-color: #3b82f6; }
-#search-dropdown {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  background: #1e293b;
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 6px;
-  overflow: hidden;
-  z-index: 200;
-  display: none;
-}
-#search-dropdown .dd-item {
-  padding: 8px 12px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #e2e8f0;
-}
-#search-dropdown .dd-item:hover { background: rgba(59,130,246,0.2); }
-/* reset btn */
-#reset-btn {
-  width: 100%;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 6px;
-  color: #94a3b8;
-  cursor: pointer;
-  padding: 7px;
-  font-size: 12px;
-  transition: background 0.15s;
-}
-#reset-btn:hover { background: rgba(255,255,255,0.1); color: #e2e8f0; }
-/* count line */
-#count-line {
-  font-size: 11px;
-  color: #64748b;
-  margin-top: 8px;
-  text-align: center;
-}
-#empty-state {
-  display: none;
-  font-size: 11px;
-  color: #ef4444;
-  text-align: center;
-  margin-top: 4px;
-}
+/* sources view */
+#sources-view{position:fixed; inset:0; overflow:auto; padding:110px 24px 60px}
+#sources-view[hidden], #network-view[hidden]{display:none}
+.wrap{max-width:1080px; margin:0 auto}
+.wrap > h2{font-family:var(--display); font-weight:600; font-size:30px; margin:34px 0 6px; line-height:1.15}
+.wrap > h2:first-child{margin-top:0}
+.lede{color:var(--muted); max-width:68ch; margin:0 0 18px}
+.method-grid{display:grid; grid-template-columns:1.2fr 1fr; gap:26px; align-items:start}
+.rubric{width:100%; border-collapse:collapse; font-size:14px}
+.rubric th, .rubric td{text-align:left; vertical-align:top; padding:10px 12px 10px 0; border-bottom:1px solid var(--rule)}
+.rubric th{font-family:var(--display); font-weight:600; color:var(--muted); font-size:13px}
+.rubric td:first-child{font-weight:600; white-space:nowrap}
+.rubric .pts{color:var(--muted); white-space:nowrap}
+.notes{list-style:none; margin:0; padding:0; display:grid; gap:12px; font-size:14px}
+.notes li{border-left:2px solid var(--rule); padding-left:12px}
+.notes b{display:block; font-weight:600}
+.your-words{border:1px dashed var(--rule); border-radius:12px; padding:14px 16px; color:var(--muted); margin-top:20px; max-width:68ch}
+.tablebar{display:flex; gap:12px; align-items:center; margin:8px 0 12px; flex-wrap:wrap}
+.tablebar .search{max-width:320px}
+.tablebar .count{color:var(--muted); font-size:13px}
+.tbl-wrap{overflow-x:auto; border:1px solid var(--rule); border-radius:12px}
+table.data{width:100%; border-collapse:collapse; font-size:13.5px; min-width:820px}
+table.data th{position:sticky; top:0; background:var(--panel-solid); text-align:left; font-family:var(--display); font-weight:600; font-size:12.5px; color:var(--muted); padding:10px 12px; border-bottom:1px solid var(--rule)}
+table.data td{padding:10px 12px; border-bottom:1px solid var(--faint); vertical-align:top}
+table.data tr:last-child td{border-bottom:0}
+table.data .net{font-weight:600; white-space:nowrap}
+table.data .net.Cooper{color:var(--cooper)} table.data .net.Whatley{color:var(--whatley)}
+.status-pill{font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--rule); white-space:nowrap}
+.status-pill.check{border-color:#FFB547; color:#FFD9A0}
+.core{list-style:none; padding:0; margin:0; display:grid; gap:10px; font-size:14px}
+footer{color:var(--dim); font-size:12.5px; margin-top:40px}
 
-/* =========================================================
-   START HERE PANEL
-   ========================================================= */
-#start-panel {
-  position: absolute;
-  bottom: 16px;
-  left: 256px;
-  width: 420px;
-  background: rgba(10,14,39,0.97);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 12px;
-  padding: 16px;
-  z-index: 85;
-  max-height: 50vh;
-  overflow-y: auto;
+@media (max-width: 820px){
+  .hint{top:96px; left:12px; right:12px; transform:none; max-width:none}
+  .top{flex-direction:column; align-items:flex-start; gap:8px; padding:calc(14px + env(safe-area-inset-top,0px)) 16px 10px}
+  .brand h1{font-size:18px} .brand p{display:none}
+  .controls{top:auto; bottom:calc(52px + env(safe-area-inset-bottom,0px)); left:12px; right:12px; width:auto; max-height:55%; display:none}
+  .controls.show{display:block}
+  .toggle-filters{display:block; position:absolute; left:12px; bottom:calc(12px + env(safe-area-inset-bottom,0px)); background:var(--panel); border:1px solid var(--rule); border-radius:9px; padding:8px 14px; font-size:13.5px; font-weight:600}
+  .status{display:none}
+  aside.panel{top:auto; left:8px; right:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px)); width:auto; height:72%; transform:translateY(calc(100% + 30px))}
+  aside.panel.open{transform:none}
+  .method-grid{grid-template-columns:1fr}
+  #sources-view{padding:110px 16px 50px}
 }
-#start-panel h2 {
-  font-size: 14px;
-  font-weight: 700;
-  color: #f1f5f9;
-  margin-bottom: 4px;
-}
-#start-panel .sub {
-  font-size: 11px;
-  color: #64748b;
-  margin-bottom: 12px;
-}
-#start-panel .close-btn {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  background: none;
-  border: none;
-  color: #64748b;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  padding: 4px;
-  min-width: 28px;
-  min-height: 28px;
-}
-#start-panel .close-btn:hover { color: #e2e8f0; }
-.start-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.start-col h3 {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.col-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.start-entry {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.05);
-  border-radius: 6px;
-  padding: 7px 9px;
-  margin-bottom: 5px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.start-entry:hover { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.3); }
-.start-entry .en { font-size: 13px; font-weight: 600; color: #f1f5f9; }
-.start-entry .er { font-size: 10px; color: #94a3b8; margin-top: 1px; }
-.start-entry .es { font-size: 10px; color: #64748b; }
-
-/* =========================================================
-   SIDEBAR
-   ========================================================= */
-#sidebar {
-  position: absolute;
-  top: 44px;
-  right: 0;
-  width: 340px;
-  height: calc(100% - 44px);
-  background: rgba(10,14,39,0.97);
-  border-left: 1px solid rgba(255,255,255,0.08);
-  overflow-y: auto;
-  z-index: 90;
-  transform: translateX(100%);
-  transition: transform 0.25s ease;
-  padding: 16px;
-}
-#sidebar.open { transform: translateX(0); }
-#sidebar-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: none;
-  border: none;
-  color: #64748b;
-  cursor: pointer;
-  font-size: 20px;
-  line-height: 1;
-  padding: 4px;
-  min-width: 32px;
-  min-height: 32px;
-}
-#sidebar-close:hover { color: #e2e8f0; }
-#sidebar h2 {
-  font-size: 16px;
-  font-weight: 700;
-  color: #f1f5f9;
-  margin-bottom: 4px;
-  padding-right: 36px;
-}
-.sb-type-badge {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 999px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 10px;
-}
-.sb-meta { font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
-.sb-meta strong { color: #cbd5e1; }
-.sb-section-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #64748b;
-  margin: 14px 0 6px;
-}
-.sb-edge {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 8px;
-  padding: 10px;
-  margin-bottom: 8px;
-}
-.sb-edge .cat-chip {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 999px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 6px;
-}
-.sb-edge .detail { font-size: 12px; color: #cbd5e1; margin-bottom: 4px; }
-.sb-edge .period { font-size: 11px; color: #64748b; margin-bottom: 4px; }
-.sb-edge .evidence { font-size: 11px; color: #94a3b8; margin-bottom: 4px; font-style: italic; }
-.sb-edge .score { font-size: 11px; color: #64748b; }
-.sb-edge a {
-  display: block;
-  font-size: 11px;
-  color: #60a5fa;
-  word-break: break-all;
-  margin-top: 4px;
-}
-.sb-edge a:hover { text-decoration: underline; }
-
-/* =========================================================
-   SOURCES TAB VIEW
-   ========================================================= */
-#sources-view {
-  display: none;
-  position: absolute;
-  top: 44px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  overflow-y: auto;
-  padding: 16px;
-  z-index: 70;
-  background: #0a0e27;
-}
-#sources-view h2 {
-  font-size: 16px;
-  font-weight: 700;
-  color: #f1f5f9;
-  margin-bottom: 4px;
-}
-#dl-link {
-  display: inline-block;
-  margin-bottom: 14px;
-  font-size: 12px;
-  color: #60a5fa;
-  text-decoration: none;
-}
-#dl-link:hover { text-decoration: underline; }
-#sources-table-wrap { overflow-x: auto; }
-#sources-table {
-  border-collapse: collapse;
-  width: 100%;
-  min-width: 700px;
-  font-size: 12px;
-}
-#sources-table th {
-  background: rgba(255,255,255,0.05);
-  color: #94a3b8;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 8px 10px;
-  text-align: left;
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-  border-bottom: 1px solid rgba(255,255,255,0.07);
-}
-#sources-table th:hover { background: rgba(255,255,255,0.09); color: #e2e8f0; }
-#sources-table th.sorted { color: #60a5fa; }
-#sources-table th .sort-arrow { margin-left: 4px; opacity: 0.5; }
-#sources-table th.sorted .sort-arrow { opacity: 1; }
-#sources-table td {
-  padding: 8px 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-  color: #cbd5e1;
-  vertical-align: top;
-}
-#sources-table tr:hover td { background: rgba(255,255,255,0.03); }
-#sources-table a { color: #60a5fa; word-break: break-all; }
-#sources-table a:hover { text-decoration: underline; }
-
-/* =========================================================
-   MOBILE OVERRIDES
-   ========================================================= */
-@media (max-width: 600px) {
-  #hamburger-btn { display: flex; }
-  #filters-panel {
-    position: fixed;
-    top: 44px;
-    left: 0;
-    width: 100%;
-    border-radius: 0;
-    max-height: 70vh;
-    display: none;
-    z-index: 200;
-  }
-  #filters-panel.mobile-open { display: block; }
-  #start-panel {
-    left: 8px;
-    right: 8px;
-    width: auto;
-    bottom: 10px;
-    max-height: 55vh;
-  }
-  #sidebar {
-    top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    height: 60vh;
-    border-left: none;
-    border-top: 1px solid rgba(255,255,255,0.1);
-    border-radius: 12px 12px 0 0;
-    transform: translateY(100%);
-  }
-  #sidebar.open { transform: translateY(0); }
-  #dim-toggle { top: 54px; right: 8px; }
-  #sources-view { padding: 10px; }
-}
+@media (prefers-reduced-motion: reduce){ aside.panel{transition:none} }
 </style>
 </head>
 <body>
-<div id="app">
-
-  <!-- GRAPH CANVAS -->
-  <div id="graph-container"></div>
-
-  <!-- TAB BAR -->
-  <div id="tab-bar" role="tablist">
-    <button class="tab-btn active" id="tab-map" role="tab" aria-selected="true" aria-controls="graph-container">Map</button>
-    <button class="tab-btn" id="tab-sources" role="tab" aria-selected="false" aria-controls="sources-view">Sources</button>
-    <button id="hamburger-btn" aria-label="Toggle filters" aria-expanded="false">☰</button>
+<header class="top">
+  <div class="brand">
+    <h1><span class="c">Roy Cooper</span>: who’s connected</h1>
+    <p>Documented relationships relevant to foreign aid advocacy. Every line links to its source.</p>
   </div>
+  <nav class="tabs" aria-label="Views">
+    <a href="#network" id="tab-network">Network</a>
+    <a href="#sources" id="tab-sources">Sources and method</a>
+  </nav>
+</header>
 
-  <!-- HINT BANNER -->
-  <div id="hint-banner" role="alert" aria-live="polite">
-    Click any dot or line to see the relationship and its source.
-    <button aria-label="Dismiss hint" onclick="dismissHint()">×</button>
+<main id="network-view">
+  <canvas id="graph" aria-label="Network of documented relationships around Roy Cooper. Use the Sources and method tab for a full list."></canvas>
+
+  <div class="controls" id="controls">
+    <h2>Start here</h2>
+    <p class="note">Key people for CARE. Select a name to see the relationship and its source.</p>
+    <h3 class="list-h"><span class="ring"></span>Allies</h3>
+    <ul class="people" id="list-allies"></ul>
+    <h3 class="list-h"><span class="ring dashed"></span>Cross-party contacts</h3>
+    <ul class="people" id="list-contacts"></ul>
+
+    <h2>Find someone</h2>
+    <input class="search" id="search" list="names" placeholder="Search a name or organization" autocomplete="off">
+    <datalist id="names"></datalist>
+
+    <div class="fhead"><h2>Filters</h2><button class="reset" id="reset" type="button">Reset</button></div>
+    <p class="shown" id="shown" aria-live="polite"></p>
+    <button class="care" id="care" aria-pressed="false"><span class="box"></span><span>Only show allies and cross-party contacts</span></button>
+
+    <h3 class="sub">Relationship type</h3>
+    <div class="chipset" id="cats"></div>
+
+    <h3 class="sub">Minimum influence score <output id="minv">1</output></h3>
+    <input class="range" type="range" id="minscore" min="1" max="5" step="0.5" value="1" aria-label="Minimum influence score">
+
+    <h3 class="sub">Groups</h3>
+    <ul class="legend" id="legend"></ul>
+
+    <details class="keys-wrap">
+      <summary>Reading the map</summary>
+      <ul class="keys">
+        <li><svg width="22" height="22" aria-hidden="true"><circle cx="11" cy="11" r="5" fill="#E6EDF7"/><circle cx="11" cy="11" r="8.5" fill="none" stroke="#4C8DFF" stroke-width="1.5"/></svg>Solid ring: ally (supports aid)</li>
+        <li><svg width="22" height="22" aria-hidden="true"><circle cx="11" cy="11" r="5" fill="#E6EDF7"/><circle cx="11" cy="11" r="8.5" fill="none" stroke="#FFB547" stroke-width="1.5" stroke-dasharray="3 2.5"/></svg>Dashed ring: cross-party contact</li>
+        <li><svg width="22" height="10" aria-hidden="true"><line x1="0" y1="5" x2="22" y2="5" stroke="#FF8A5C" stroke-width="1.5" stroke-dasharray="4 3"/></svg>Dashed line: adversarial relationship</li>
+        <li><svg width="22" height="10" aria-hidden="true"><line x1="0" y1="5" x2="22" y2="5" stroke="#8C97A8" stroke-width="2.5"/></svg>Thicker line, more pulses: stronger tie</li>
+        <li><svg width="22" height="22" aria-hidden="true"><circle cx="11" cy="11" r="3.5" fill="#8C97A8"/><circle cx="11" cy="11" r="8" fill="#8C97A8" opacity=".5"/></svg>Bigger dot: higher influence score</li>
+      </ul>
+    </details>
   </div>
+  <button class="toggle-filters" id="toggle-filters" aria-controls="controls" aria-expanded="false">Filters</button>
 
-  <!-- 3D/2D TOGGLE -->
-  <button id="dim-toggle" aria-label="Toggle 3D/2D view">Switch to 2D</button>
+  <p class="status" id="status"></p>
+  <div class="hint" id="hint" hidden><span>Click any dot or line to see the relationship and its source. Scroll to zoom, drag to move.</span><button type="button" id="hint-close" aria-label="Dismiss tip">Got it</button></div>
+  <div class="empty" id="empty" hidden><p>No one matches these filters.</p><button type="button" id="empty-reset">Reset filters</button></div>
 
-  <!-- FILTERS PANEL -->
-  <aside id="filters-panel" aria-label="Filters">
-    <div style="position:relative;">
-      <div class="filters-section">
-        <label class="section-label">Group</label>
-        <div class="radio-group">
-          <label><input type="radio" name="group" value="all" checked> All</label>
-          <label><input type="radio" name="group" value="allies"> Allies only</label>
-          <label><input type="radio" name="group" value="bridges"> Bridges only</label>
-        </div>
+  <aside class="panel" id="panel" aria-live="polite" aria-label="Details"></aside>
+</main>
+
+<main id="sources-view" hidden>
+  <div class="wrap">
+    <h2>How this map was built</h2>
+    <p class="lede">Each dot is a person or organization. Each line is a documented relationship with Roy Cooper, scored with the rubric below.</p>
+
+    <div class="method-grid">
+      <div>
+        <table class="rubric">
+          <thead><tr><th>Dimension</th><th>Levels</th><th>Points</th></tr></thead>
+          <tbody>
+            <tr><td>Relationship strength</td><td>Group-level only, such as a letter to the whole delegation (0.5)<br>Documented individual interaction, such as a meeting or appearance (1.5)<br>Direct collaboration, such as a negotiated deal, endorsement, employment or recruitment (2.5)</td><td class="pts">0.5–2.5</td></tr>
+            <tr><td>Say over aid</td><td>Sits on Appropriations, House Foreign Affairs or Senate Foreign Relations, or holds party leadership (1)<br>Other sitting member of Congress or senior official (0.5)<br>No formal role (0)</td><td class="pts">0–1</td></tr>
+            <tr><td>Stance on aid</td><td>Publicly supported aid or opposed the 2025 cuts (1)<br>Mixed, or no public record (0.5)<br>Publicly supported the cuts (0)</td><td class="pts">0–1</td></tr>
+            <tr><td>Influence score</td><td>Sum of the three, plus 0.5. A person’s score uses their strongest relationship.</td><td class="pts">1–5</td></tr>
+          </tbody>
+        </table>
       </div>
-
-      <div class="filters-section">
-        <label class="section-label">Relationship Type</label>
-        <div class="check-group" id="rel-type-checks">
-          <label>
-            <input type="checkbox" class="rel-check" value="legislative/governing" checked>
-            <span class="chip-label"><span class="chip-dot" style="background:#3b82f6"></span>Legislative/Governing</span>
-          </label>
-          <label>
-            <input type="checkbox" class="rel-check" value="disaster_response" checked>
-            <span class="chip-label"><span class="chip-dot" style="background:#ef4444"></span>Disaster Response</span>
-          </label>
-          <label>
-            <input type="checkbox" class="rel-check" value="business_recruitment" checked>
-            <span class="chip-label"><span class="chip-dot" style="background:#10b981"></span>Business Recruitment</span>
-          </label>
-          <label>
-            <input type="checkbox" class="rel-check" value="campaign/endorsement" checked>
-            <span class="chip-label"><span class="chip-dot" style="background:#a855f7"></span>Campaign/Endorsement</span>
-          </label>
-          <label>
-            <input type="checkbox" class="rel-check" value="professional" checked>
-            <span class="chip-label"><span class="chip-dot" style="background:#f97316"></span>Professional</span>
-          </label>
-        </div>
-      </div>
-
-      <div class="filters-section">
-        <label class="section-label">Min Influence Score <span id="slider-val">1.0</span></label>
-        <input type="range" id="score-slider" min="1.0" max="5.0" step="0.5" value="1.0" aria-label="Minimum influence score">
-      </div>
-
-      <div class="filters-section" style="position:relative;">
-        <label class="section-label">Search</label>
-        <input type="text" id="search-input" placeholder="Node name…" autocomplete="off" aria-label="Search nodes">
-        <div id="search-dropdown" role="listbox"></div>
-      </div>
-
-      <button id="reset-btn" aria-label="Reset all filters">Reset filters</button>
-      <div id="count-line">Loading…</div>
-      <div id="empty-state" role="status">No results. Try resetting filters.</div>
+      <ul class="notes">
+        <li><b>CARE roles</b>Allies are current officeholders with a positive tie to Cooper and a public record supporting aid or no record against it. Cross-party contacts have a positive tie to Cooper but are from the other party or supported the 2025 cuts.</li>
+        <li><b>Adversarial ties</b>Conflicts, such as Cooper and Trump during Hurricane Helene, appear on the map but don’t count toward CARE roles.</li>
+        <li><b>Sources</b>Government press releases, news coverage and congressional vote records. Every relationship and stated aid position links to the source that documents it. Committee assignments are from congress.gov.</li>
+      </ul>
     </div>
-  </aside>
 
-  <!-- START HERE PANEL -->
-  <div id="start-panel" role="complementary" aria-label="Start Here: Allies and Bridges">
-    <button class="close-btn" aria-label="Close Start Here panel" onclick="closeStartPanel()">×</button>
-    <h2>Start Here</h2>
-    <p class="sub">Key contacts for foreign aid advocacy</p>
-    <div class="start-cols">
-      <div class="start-col">
-        <h3><span class="col-dot" style="background:#22d3ee"></span> Allies</h3>
-        <div id="allies-list"></div>
-      </div>
-      <div class="start-col">
-        <h3><span class="col-dot" style="background:#eab308"></span> Bridges</h3>
-        <div id="bridges-list"></div>
-      </div>
+
+    <h2>Relationship sources</h2>
+    <p class="lede">Every relationship on the map, with the source that documents it.</p>
+    <div class="tablebar">
+      <input class="search" id="rel-filter" placeholder="Filter by name, relationship or source" autocomplete="off">
+      <span class="count" id="rel-count"></span>
+      <button class="dl" id="dl" type="button">Download all data (CSV)</button>
     </div>
+    <div class="tbl-wrap"><table class="data" id="rel-table">
+      <thead><tr><th><button data-sort="name">Person or organization <span class="arr">↕</span></button></th><th><button data-sort="cat">Relationship <span class="arr">↕</span></button></th><th><button data-sort="date">When <span class="arr">↕</span></button></th><th><button data-sort="score">Score <span class="arr">↕</span></button></th><th>Evidence</th><th>Source</th><th>Aid stance source</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+
+    <footer>Prepared for CARE USA as part of Stanford IR 192 research. Data current as of November 3, 2026.</footer>
   </div>
+</main>
 
-  <!-- SIDEBAR -->
-  <aside id="sidebar" role="complementary" aria-label="Node / Edge details" aria-hidden="true">
-    <button id="sidebar-close" aria-label="Close sidebar">×</button>
-    <div id="sidebar-content"></div>
-  </aside>
-
-  <!-- SOURCES VIEW -->
-  <div id="sources-view" role="main" aria-label="Sources table">
-    <h2>All Relationships</h2>
-    <a id="dl-link" href="relationships.csv" download>Download all data (CSV)</a>
-    <div id="sources-table-wrap">
-      <table id="sources-table" aria-label="Relationships table">
-        <thead>
-          <tr>
-            <th data-col="node_b">Person <span class="sort-arrow">↕</span></th>
-            <th data-col="node_b_type">Type <span class="sort-arrow">↕</span></th>
-            <th data-col="relationship_type">Category <span class="sort-arrow">↕</span></th>
-            <th data-col="period">Date <span class="sort-arrow">↕</span></th>
-            <th data-col="evidence">Evidence <span class="sort-arrow">↕</span></th>
-            <th data-col="influence_score">Score <span class="sort-arrow">↕</span></th>
-            <th data-col="source_url">Source <span class="sort-arrow">↕</span></th>
-          </tr>
-        </thead>
-        <tbody id="sources-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-
-</div><!-- #app -->
-
-<!-- CDN SCRIPTS -->
-<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="https://unpkg.com/3d-force-graph@1.73.3/dist/3d-force-graph.min.js"></script>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script>
-/* =========================================================
-   EMBEDDED CSV DATA
-   ========================================================= */
-const CSV_DATA = `node_a,node_a_type,node_b,node_b_type,relationship_type,period,evidence,source_url,influence_score,candidate_network,is_sitting_member,is_nc_delegation,relationship_detail,committee_assignments,aid_committee_flag,stance_on_aid,stance_source,tie_strength,aid_power,aid_stance,aid_stance_known,cross_party,relationship_valence,term_status,notes
-Roy Cooper,candidate,Thom Tillis,senator,disaster_response,2017-2024,"Matthew/Florence/Helene requests; named meeting Nov 2024",https://governor.nc.gov/news/press-releases/2024/11/20/governor-cooper-travel-washington-dc-present-request-more-25-billion-federal-funding-helene-recovery,2.0,Cooper,True,True,disaster_aid_coordination,"Finance; Veterans Affairs; Banking, Housing & Urban Affairs; Judiciary",,Voted YES on H.R. 4; warned ""we'll have to come back and fix it"",https://rollcall.com/2025/07/17/senate-sends-9-billion-rescissions-package-to-the-house/,1.5,0.0,0.0,True,True,positive,outgoing (term ends Jan 2027),
-Roy Cooper,candidate,Ted Budd,senator,disaster_response,2017-2024,"Matthew/Florence/Helene requests; named meeting Nov 2024",https://governor.nc.gov/news/press-releases/2024/11/20/governor-cooper-travel-washington-dc-present-request-more-25-billion-federal-funding-helene-recovery,2.5,Cooper,True,True,disaster_aid_coordination,"Commerce, Science & Transportation; Health, Education, Labor & Pensions; Small Business & Entrepreneurship",,Voted YES on H.R. 4 (Senate Vote 411 51-48),https://www.senate.gov/legislative/LIS/roll_call_votes/vote1191/vote_119_1_00411.htm,1.5,0.5,0.0,True,True,positive,,Cooper's NC Senate colleague from Jan 2027
-Roy Cooper,candidate,Chuck Edwards,representative,disaster_response,2024,Named Helene meeting; Edwards is Vice Chair House Approps State/Foreign Ops,https://governor.nc.gov/news/press-releases/2024/11/20/governor-cooper-travel-washington-dc-present-request-more-25-billion-federal-funding-helene-recovery,3.0,Cooper,True,True,disaster_aid_coordination,"APPROPRIATIONS — National Security, Dept of State & Related Programs (Vice Chair) ***",House Approps — State/Foreign Ops (Vice Chair),"Voted YES on H.R. 4; censured Sept 1, 2026; not seeking reelection",https://clerk.house.gov/Votes/2025203,1.5,1.0,0.0,True,True,positive,,
-Roy Cooper,candidate,Deborah Ross,representative,legislative/governing,2023-2024,"S-Line event; NASA/Koch event; Biden-Cooper Helene survey",https://governor.nc.gov/news/press-releases/2023/12/11/governor-cooper-joins-us-dot-secretary-pete-buttigieg-celebrate-record-breaking-grant-s-line,3.5,Cooper,True,True,federal_initiatives,"Judiciary; Science, Space & Technology",,Voted NO on H.R. 4; said Democrats ""will rebuild and properly fund USAID"",https://ross.house.gov/2025/6/congresswoman-ross-votes-against-sweeping-gop-budget-cuts-for-usaid-and-public-broadcasting,1.5,0.5,1.0,True,False,positive,,
-Roy Cooper,candidate,Valerie Foushee,representative,legislative/governing,2022,VinFast and Wolfspeed announcements,https://governor.nc.gov/news/press-releases/2022/03/29/governor-cooper-announces-vinfast-automotive-selects-north-carolina-electric-vehicle-assembly-plant,3.5,Cooper,True,True,economic_development,Education & Workforce; Transportation & Infrastructure,,Voted NO on H.R. 4; strongest NC critic of USAID cuts; joined amicus brief,https://foushee.house.gov/media/press-releases/rep-foushee-joins-amicus-brief-slams-trump-admins-unconstitutional-usaid-rif,1.5,0.5,1.0,True,False,positive,,
-Roy Cooper,candidate,Virginia Foxx,representative,disaster_response,2017-2018,"Recipient, as a 2017 NC delegation member, of Cooper's $929M Hurricane Matthew supplemental aid request (letter credits delegation's prior advocacy). Weak tie: addressed to whole delegation, not individually.",https://governor.nc.gov/documents/files/federal-request-hurricane-matthew-relief/open,1.5,Cooper,True,True,delegation_disaster_aid,Rules (Chair); Oversight & Reform,,Voted YES on H.R. 4; sponsored H.Res. 590,https://clerk.house.gov/Votes/2025203,0.5,0.5,0.0,True,True,positive,,
-Roy Cooper,candidate,David Rouzer,representative,disaster_response,2017-2018,"Recipient, as a 2017 NC delegation member, of Cooper's $929M Hurricane Matthew supplemental aid request (letter credits delegation's prior advocacy). Weak tie: addressed to whole delegation, not individually.",https://governor.nc.gov/documents/files/federal-request-hurricane-matthew-relief/open,1.5,Cooper,True,True,delegation_disaster_aid,"Transportation & Infrastructure; Agriculture; Science, Space & Technology",,Voted YES on H.R. 4,https://clerk.house.gov/Votes/2025203,0.5,0.5,0.0,True,True,positive,,
-Roy Cooper,candidate,Richard Hudson,representative,disaster_response,2017-2018,"Recipient, as a 2017 NC delegation member, of Cooper's $929M Hurricane Matthew supplemental aid request (letter credits delegation's prior advocacy). Weak tie: addressed to whole delegation, not individually.",https://governor.nc.gov/documents/files/federal-request-hurricane-matthew-relief/open,1.5,Cooper,True,True,delegation_disaster_aid,"Energy & Commerce (Subcom. Communications & Technology, Chair)",,Voted YES on H.R. 4,https://clerk.house.gov/Votes/2025203,0.5,0.5,0.0,True,True,positive,,
-Roy Cooper,candidate,Alma Adams,representative,disaster_response,2017-2018,"Recipient, as a 2017 NC delegation member, of Cooper's $929M Hurricane Matthew supplemental aid request (letter credits delegation's prior advocacy). Weak tie: addressed to whole delegation, not individually.",https://governor.nc.gov/documents/files/federal-request-hurricane-matthew-relief/open,2.5,Cooper,True,True,delegation_disaster_aid,Agriculture; Education & Labor,,Voted NO on H.R. 4,https://adams.house.gov/media-center/press-releases/rep-adams-votes-no-recissions-package-cuts-foreign-aid-and-public,0.5,0.5,1.0,True,False,positive,,
-Roy Cooper,candidate,Phil Berger,state_official,legislative/governing,2017-2024,"Mar 27, 2023: stood with Cooper at the Medicaid expansion bill signing.",https://apnews.com/article/north-carolina-medicaid-expansion-roy-cooper-legislature-f00242e5883bccf816a679a76584a5f9,2.5,Cooper,False,False,legislated_together/adversarial,NC state official (not Congress),,,,1.5,0.0,0.5,False,True,positive,,
-Roy Cooper,candidate,DSCC,party_org,campaign/endorsement,2025-2026,"Schumer/Gillibrand welcome statement; 2026 race statement",https://www.dscc.org/article/statement-from-senate-minority-leader-chuck-schumer-and-dscc-chair-kirsten-gillibrand-on-north-carolina-senate-race/,2.5,Cooper,False,False,recruitment/campaign_support,,,,,1.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Chuck Schumer,senator,campaign/endorsement,2025,Joined DSCC statement praising Coopers entry,https://www.dscc.org/article/statement-from-senate-minority-leader-chuck-schumer-and-dscc-chair-kirsten-gillibrand-on-north-carolina-senate-race/,4.0,Cooper,True,False,recruitment/campaign_support,Senate Democratic Leader,,,,1.5,1.0,1.0,True,False,positive,,
-Roy Cooper,candidate,Kirsten Gillibrand,senator,campaign/endorsement,2025-2026,DSCC chair publicly welcomed Cooper,https://www.dscc.org/article/statement-from-senate-minority-leader-chuck-schumer-and-dscc-chair-kirsten-gillibrand-on-north-carolina-senate-race/,3.5,Cooper,True,False,recruitment/campaign_support,Armed Services; Agriculture; Aging,,,,1.5,0.5,1.0,True,False,positive,,
-Roy Cooper,candidate,DGA,party_org,campaign/endorsement,2021-2022,Chosen DGA chair for 2022,https://democraticgovernors.org/updates/democratic-governors-select-gov-roy-cooper-as-next-dga-chair/,2.5,Cooper,False,False,party_leadership,,,,,1.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Joe Biden,admin_official,legislative/governing,2021-2024,"Broadband funding; Helene survey; Helene funding meeting",https://governor.nc.gov/news/press-releases/2024/10/02/photos-available-governor-cooper-and-president-biden-survey-damage-hurricane-helene-during-aerial,2.5,Cooper,False,False,federal_state_initiatives,,,,,1.5,0.0,0.5,True,False,positive,,
-Roy Cooper,candidate,Kamala Harris,admin_official,professional,2024,"Durham federal-funding event; VP search (withdrew)",https://www.cnn.com/2024/07/29/politics/harris-vice-president-roy-cooper/index.html,2.5,Cooper,False,False,worked_together/VP_consideration,,,,,1.5,0.0,0.5,True,False,positive,,
-Roy Cooper,candidate,Pete Buttigieg,admin_official,legislative/governing,2023-2024,Two S-Line events,https://governor.nc.gov/news/press-releases/2023/12/11/governor-cooper-joins-us-dot-secretary-pete-buttigieg-celebrate-record-breaking-grant-s-line,2.5,Cooper,False,False,infrastructure,,,,,1.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,AFGE,party_org,campaign/endorsement,2026,Senate endorsement Feb 2026,https://www.afge.org/publication/largest-federal-employee-union-endorses-roy-cooper-for-election-to-the-us-senate/,3.5,Cooper,False,False,endorsement,,,,,2.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Fumio Kishida,diplomat,business_recruitment,2024,"State lunch; Toyota and HondaJet visits",https://governor.nc.gov/news/press-releases/2024/04/12/updated-pool-reportfootagephotos-available-governor-and-mrs-cooper-host-state-lunch-honoring-prime,2.5,Cooper,False,False,foreign_engagement/state_visit,,,,,1.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Rahm Emanuel,diplomat,business_recruitment,2023-2024,"Tokyo meeting; Kishida NC visit",https://governor.nc.gov/news/press-releases/2023/10/16/north-carolina-delegation-attends-southeast-usjapan-economic-summit-encourages-investment-north,2.5,Cooper,False,False,economic_diplomacy,,,,,1.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Akio Toyoda (Toyota),business,business_recruitment,2023,Toyota chairman meeting,https://governor.nc.gov/news/press-releases/2023/10/16/north-carolina-delegation-attends-southeast-usjapan-economic-summit-encourages-investment-north,2.5,Cooper,False,False,business_recruitment,,,,,1.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Koji Sato (Toyota),business,business_recruitment,2023,Toyota president meeting; NC investment announcement,https://governor.nc.gov/news/press-releases/2023/10/16/north-carolina-delegation-attends-southeast-usjapan-economic-summit-encourages-investment-north,2.5,Cooper,False,False,business_recruitment,,,,,1.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,FUJIFILM (Teiichi Goto),business,business_recruitment,2023,Meeting on NC facilities,https://governor.nc.gov/news/press-releases/2023/10/16/north-carolina-delegation-attends-southeast-usjapan-economic-summit-encourages-investment-north,2.5,Cooper,False,False,business_recruitment,,,,,1.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Shigeo Yamada,diplomat,business_recruitment,2024,Hosted Japanese ambassador at SEUS/Japan,https://governor.nc.gov/news/press-releases/2024/10/28/governor-cooper-hosts-japanese-ambassador-us-and-senior-japanese-business-leaders-46th-annual,2.5,Cooper,False,False,diplomatic_engagement,,,,,1.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Schneider Electric,business,business_recruitment,2024,France meeting,https://governor.nc.gov/news/press-releases/2024/05/24/governor-cooper-travels-france-economic-development-trip,2.5,Cooper,False,False,business_recruitment,,,,,1.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Siemens AG,business,business_recruitment,2024,Germany meeting,https://governor.nc.gov/news/press-releases/2024/05/28/governor-cooper-travels-germany-economic-development-trip,2.5,Cooper,False,False,business_recruitment,,,,,1.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Novartis,business,business_recruitment,2024,Switzerland meeting,https://governor.nc.gov/news/press-releases/2024/05/30/governor-cooper-travels-switzerland-economic-development-trip,2.5,Cooper,False,False,business_recruitment,,,,,1.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Thom Tillis,senator,disaster_response,2017,"Recipient, as a 2017 NC delegation member, of Cooper's $929M Hurricane Matthew supplemental aid request (letter credits delegation's prior advocacy). Weak tie: addressed to whole delegation, not individually.",https://governor.nc.gov/documents/files/federal-request-hurricane-matthew-relief/open,1.0,Cooper,True,True,matthew_delegation_request,"Finance; Veterans Affairs; Banking, Housing & Urban Affairs; Judiciary",,Voted YES on H.R. 4; warned ""we'll have to come back and fix it"",https://rollcall.com/2025/07/17/senate-sends-9-billion-rescissions-package-to-the-house/,0.5,0.0,0.0,True,True,positive,outgoing (term ends Jan 2027),
-Roy Cooper,candidate,Ted Budd,senator,disaster_response,2017,"Recipient, as a 2017 NC delegation member (then U.S. House), of Cooper's $929M Hurricane Matthew supplemental aid request (letter credits delegation's prior advocacy). Weak tie: addressed to whole delegation, not individually.",https://governor.nc.gov/documents/files/federal-request-hurricane-matthew-relief/open,1.5,Cooper,True,True,matthew_delegation_request,"Commerce, Science & Transportation; Health, Education, Labor & Pensions; Small Business & Entrepreneurship",,Voted YES on H.R. 4 (Senate Vote 411 51-48),https://www.senate.gov/legislative/LIS/roll_call_votes/vote1191/vote_119_1_00411.htm,0.5,0.5,0.0,True,True,positive,,Cooper's NC Senate colleague from Jan 2027
-Roy Cooper,candidate,Spencer Cox,state_official,legislative/governing,2023,"July 14, 2023: Cox elected NGA chair; Cooper on same Executive Committee",https://governor.utah.gov/press/utah-gov-spencer-j-cox-elected-chair-of-national-governors-association-launches-disagree-better-initiative/,1.5,Cooper,False,False,NGA_executive_committee,,,,,0.5,0.0,0.5,False,True,positive,,
-Roy Cooper,candidate,Kevin Stitt,state_official,legislative/governing,2022-2023,"July 15, 2022: Cooper elected to NGA Executive Committee alongside Stitt",https://nsjonline.com/article/2022/07/cooper-elected-governors-executive-committee/,1.5,Cooper,False,False,NGA_executive_committee,,,,,0.5,0.0,0.5,False,True,positive,,
-Roy Cooper,candidate,Doug Burgum,admin_official,legislative/governing,2022,"July 15, 2022: Cooper elected to NGA Executive Committee alongside Burgum (now Interior Secretary)",https://nsjonline.com/article/2022/07/cooper-elected-governors-executive-committee/,1.5,Cooper,False,False,NGA_executive_committee,,,,,0.5,0.0,0.5,False,True,positive,,
-Roy Cooper,candidate,Donald Trump,admin_official,disaster_response,2024,"Oct 21, 2024: Cooper asked Trump not to spread lies or misinformation during Swannanoa visit",https://wlos.com/news/local/north-carolina-roy-cooper-fema-administrator-deanne-criswell-asheville-community-care-station-tunnel-road-helene-recovery-storm-damage-response,3.0,Cooper,False,False,adversarial_helene,,,,,1.5,1.0,0.0,True,True,adversarial,,
-Roy Cooper,candidate,Le Thi Thu Thuy,business,business_recruitment,2022,"Mar 29, 2022: VinFast $4B, 7500-job Chatham County plant announcement",https://governor.nc.gov/news/press-releases/2022/03/29/governor-cooper-announces-vinfast-automotive-selects-north-carolina-electric-vehicle-assembly-plant,2.5,Cooper,False,False,business_recruitment_vinfast,,,,,1.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Chuck Edwards,representative,disaster_response,2024,"Sept 30, 2024: joined Cooper at Asheville airport news conference on Helene. Same day, publicly questioned where 400 FEMA pallets went",https://governor.nc.gov/news/press-releases/2024/09/30/photovideo-available-governor-cooper-travels-western-nc-survey-storm-damage-hurricane-helene,3.0,Cooper,True,True,helene_survey_and_friction,"APPROPRIATIONS — National Security, Dept of State & Related Programs (Vice Chair)",House Approps — State/Foreign Ops (Vice Chair),"Voted YES on H.R. 4; censured Sept 1, 2026; not seeking reelection",https://clerk.house.gov/Votes/2025203,1.5,1.0,0.0,True,True,positive,,
-Roy Cooper,candidate,Deborah Ross,representative,disaster_response,2024,"Led Nov 22, 2024 NC Democratic delegation letter urging House leaders to fully meet Cooper's $25.57B Helene request",https://ross.house.gov/press-releases?ID=498B43CB-C271-4A2E-A27B-3026353CDF02,3.5,Cooper,True,True,helene_delegation_letter_lead,"Judiciary; Science, Space & Technology",,Voted NO on H.R. 4; said Democrats ""will rebuild and properly fund USAID"",https://ross.house.gov/2025/6/congresswoman-ross-votes-against-sweeping-gop-budget-cuts-for-usaid-and-public-broadcasting,1.5,0.5,1.0,True,False,positive,,
-Roy Cooper,candidate,Tim Moore,representative,legislative/governing,2017,"Mar 30, 2017: Cooper signed the HB2 repeal compromise; House Speaker Moore publicly described the deal as a 'very measured approach.'",https://www.wunc.org/politics/2017-03-30/nc-gov-roy-cooper-signs-compromise-bill-repealing-hb2,3.5,Cooper,True,True,HB2_repeal_compromise,Not retrieved (freshman),,Voted YES on H.R. 4,https://clerk.house.gov/Votes/2025203,2.5,0.5,0.0,True,True,positive,,
-Roy Cooper,candidate,Phil Berger,state_official,legislative/governing,2021,"Oct 1, 2021: Cooper-Berger-Moore three-way HB 951 energy compromise announced",https://www.wunc.org/environment/2021-10-01/gov-cooper-gop-leaders-reach-deal-over-contentious-energy-bill,3.5,Cooper,False,False,HB951_energy_deal,,,,,2.5,0.0,0.5,False,True,positive,,
-Roy Cooper,candidate,Unifi (Greensboro/Yadkinville),business,business_recruitment,2018,"Jan 16, 2018: toured Repreve recycled-fiber plant in Yadkinville. Said ""Unifi is one of those companies that does provide those jobs""",https://www.recyclingtoday.com/news/unifi-hosts-north-carolina-governor-roy-cooper/,3.5,Cooper,False,False,repreve_plant_tour,,,,,2.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Gildan Yarns / Eden,business,business_recruitment,2019,"Oct 2019: Cooper announced Gildan Yarns' Eden mill (85 jobs), supported by a $250000 One NC Fund grant.",https://www.commerce.nc.gov/news/press-releases/textile-manufacturer-invest-5-million-eden,3.5,Cooper,False,False,gildan_eden_expansion,,,,,2.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Glen Raven / Norlina,business,business_recruitment,2021,"Jul 21, 2021: announced 205-job, $82M Norlina expansion",https://www.textileworld.com/textile-world/2021/07/glen-raven-selects-warren-county-nc-for-major-expansion/,3.5,Cooper,False,False,glen_raven_norlina_expansion,,,,,2.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,NC National Guard – Malawi SPP,military,legislative/governing,2023-2024,"Authorized NC-Malawi State Partnership Program. Chief of staff Kristi Jones signed Letter of Intent Apr 27, 2024. President Chakwera publicly thanked ""Governor Cooper, in particular""",https://www.africom.mil/article/35486/north-carolina-national-guard-welcomes-malawi-as-their-new-state-partners,3.5,Cooper,False,False,malawi_spp_authorization,,,,,2.5,0.0,0.5,False,False,positive,,
-Roy Cooper,candidate,Deborah Ross,representative,disaster_response,2024,"Nov 22, 2024: led and signed a letter to Speaker Johnson supporting Governor Cooper's $25.57B Hurricane Helene federal funding request.",https://ross.house.gov/_cache/files/3/e/3e24527f-4c41-442c-9887-248b019658e8/C275DA152F94BEF092E215E7CD8631FD.helene-cooper-request-letter-november-2024-final.pdf,3.5,Cooper,True,True,helene_letter_signatory,"Judiciary; Science, Space & Technology",,Voted NO on H.R. 4; said Democrats ""will rebuild and properly fund USAID"",https://ross.house.gov/2025/6/congresswoman-ross-votes-against-sweeping-gop-budget-cuts-for-usaid-and-public-broadcasting,1.5,0.5,1.0,True,False,positive,,
-Roy Cooper,candidate,Don Davis,representative,disaster_response,2024,"Nov 22, 2024: signed a letter to Speaker Johnson supporting Governor Cooper's Hurricane Helene federal funding request.",https://ross.house.gov/_cache/files/3/e/3e24527f-4c41-442c-9887-248b019658e8/C275DA152F94BEF092E215E7CD8631FD.helene-cooper-request-letter-november-2024-final.pdf,3.5,Cooper,True,True,helene_letter_signatory,Armed Services; Agriculture,,Voted NO on H.R. 4 (Rescissions Act),https://clerk.house.gov/Votes/2025203,1.5,0.5,1.0,True,False,positive,,
-Roy Cooper,candidate,Alma Adams,representative,disaster_response,2024,"Nov 22, 2024: signed a letter to Speaker Johnson supporting Governor Cooper's Hurricane Helene federal funding request.",https://ross.house.gov/_cache/files/3/e/3e24527f-4c41-442c-9887-248b019658e8/C275DA152F94BEF092E215E7CD8631FD.helene-cooper-request-letter-november-2024-final.pdf,3.5,Cooper,True,True,helene_letter_signatory,Agriculture; Education & Labor,,Voted NO on H.R. 4,https://adams.house.gov/media-center/press-releases/rep-adams-votes-no-recissions-package-cuts-foreign-aid-and-public,1.5,0.5,1.0,True,False,positive,,
-Roy Cooper,candidate,Valerie Foushee,representative,disaster_response,2024,"Nov 22, 2024: signed a letter to Speaker Johnson supporting Governor Cooper's Hurricane Helene federal funding request.",https://ross.house.gov/_cache/files/3/e/3e24527f-4c41-442c-9887-248b019658e8/C275DA152F94BEF092E215E7CD8631FD.helene-cooper-request-letter-november-2024-final.pdf,3.5,Cooper,True,True,helene_letter_signatory,Education & Workforce; Transportation & Infrastructure,,Voted NO on H.R. 4; strongest NC critic of USAID cuts; joined amicus brief,https://foushee.house.gov/media/press-releases/rep-foushee-joins-amicus-brief-slams-trump-admins-unconstitutional-usaid-rif,1.5,0.5,1.0,True,False,positive,,
-Roy Cooper,candidate,Tim Moore,representative,legislative/governing,2021,"Oct 1, 2021: Cooper, Senate Leader Berger and Speaker Moore announced the HB 951 energy compromise in a joint news release.",https://www.wunc.org/environment/2021-10-01/gov-cooper-gop-leaders-reach-deal-over-contentious-energy-bill,3.5,Cooper,True,True,HB951_energy_deal,,,Voted YES on H.R. 4,https://clerk.house.gov/Votes/2025203,2.5,0.5,0.0,True,True,positive,,
-Roy Cooper,candidate,Tim Moore,representative,legislative/governing,2023,"Mar 27, 2023: stood with Cooper at the Medicaid expansion bill signing.",https://apnews.com/article/north-carolina-medicaid-expansion-roy-cooper-legislature-f00242e5883bccf816a679a76584a5f9,2.5,Cooper,True,True,medicaid_expansion,,,Voted YES on H.R. 4,https://clerk.house.gov/Votes/2025203,1.5,0.5,0.0,True,True,positive,,`;
+const DATA = {"nodes": [{"id": "Roy Cooper", "name": "Roy Cooper", "type": "candidate", "group": "candidate", "typeLabel": "Former Governor of North Carolina", "networks": []}, {"id": "Thom Tillis", "name": "Thom Tillis", "type": "senator", "committee_assignments": "Finance; Veterans Affairs; Banking, Housing & Urban Affairs; Judiciary", "stance_on_aid": "Voted YES on H.R. 4 (Rescissions Act of 2025) while warning that Congress would “have to come back and fix it.”", "stance_source": "https://rollcall.com/2025/07/17/senate-sends-9-billion-rescissions-package-to-the-house/", "is_sitting_member": true, "is_nc_delegation": true, "aid_stance_known": true, "cross_party_with": ["Cooper"], "group": "congress", "typeLabel": "U.S. senator", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.5, "stance": 0.0}, "stanceLabel": "Supported the 2025 cuts", "stance_domain": "rollcall.com", "bridge": true, "ally": false, "note": "Did not seek reelection in 2026; his Senate term ends in January 2027.", "note_source": "https://rollcall.com/2025/07/28/roy-cooper-north-carolina-senate-election/"}, {"id": "Ted Budd", "name": "Ted Budd", "type": "senator", "committee_assignments": "Commerce, Science & Transportation; Health, Education, Labor & Pensions; Small Business & Entrepreneurship", "stance_on_aid": "Voted YES on H.R. 4 (Rescissions Act of 2025), Senate roll call vote 411.", "stance_source": "https://www.senate.gov/legislative/LIS/roll_call_votes/vote1191/vote_119_1_00411.htm", "is_sitting_member": true, "is_nc_delegation": true, "aid_stance_known": true, "cross_party_with": ["Cooper"], "group": "congress", "typeLabel": "U.S. senator", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.5, "stance": 0.0}, "stanceLabel": "Supported the 2025 cuts", "stance_domain": "senate.gov", "bridge": true, "ally": false}, {"id": "Chuck Edwards", "name": "Chuck Edwards", "type": "representative", "committee_assignments": "APPROPRIATIONS — National Security, Dept of State & Related Programs (Vice Chair)", "stance_on_aid": "Voted YES on H.R. 4 (Rescissions Act of 2025).", "stance_source": "https://clerk.house.gov/Votes/2025203", "is_sitting_member": true, "is_nc_delegation": true, "aid_stance_known": true, "cross_party_with": ["Cooper"], "group": "congress", "typeLabel": "U.S. representative", "networks": ["Cooper"], "score": 3.0, "breakdown": {"tie": 1.5, "power": 1.0, "stance": 0.0}, "stanceLabel": "Supported the 2025 cuts", "stance_domain": "clerk.house.gov", "bridge": true, "ally": false}, {"id": "Deborah Ross", "name": "Deborah Ross", "type": "representative", "committee_assignments": "Judiciary; Science, Space & Technology", "stance_on_aid": "Voted NO on H.R. 4 (Rescissions Act of 2025) and said Democrats “will rebuild and properly fund USAID.”", "stance_source": "https://ross.house.gov/2025/6/congresswoman-ross-votes-against-sweeping-gop-budget-cuts-for-usaid-and-public-broadcasting", "is_sitting_member": true, "is_nc_delegation": true, "aid_stance_known": true, "group": "congress", "typeLabel": "U.S. representative", "networks": ["Cooper"], "score": 3.5, "breakdown": {"tie": 1.5, "power": 0.5, "stance": 1.0}, "stanceLabel": "Supports aid or opposed the 2025 cuts", "stance_domain": "ross.house.gov", "bridge": false, "ally": true}, {"id": "Valerie Foushee", "name": "Valerie Foushee", "type": "representative", "committee_assignments": "Education & Workforce; Transportation & Infrastructure", "stance_on_aid": "Joined an amicus brief opposing the administration’s USAID reduction in force.", "stance_source": "https://foushee.house.gov/media/press-releases/rep-foushee-joins-amicus-brief-slams-trump-admins-unconstitutional-usaid-rif", "is_sitting_member": true, "is_nc_delegation": true, "aid_stance_known": true, "group": "congress", "typeLabel": "U.S. representative", "networks": ["Cooper"], "score": 3.5, "breakdown": {"tie": 1.5, "power": 0.5, "stance": 1.0}, "stanceLabel": "Supports aid or opposed the 2025 cuts", "stance_domain": "foushee.house.gov", "bridge": false, "ally": true}, {"id": "Virginia Foxx", "name": "Virginia Foxx", "type": "representative", "committee_assignments": "Rules (Chair); Oversight & Reform", "stance_on_aid": "Voted YES on H.R. 4 (Rescissions Act of 2025).", "stance_source": "https://clerk.house.gov/Votes/2025203", "is_sitting_member": true, "is_nc_delegation": true, "aid_stance_known": true, "cross_party_with": ["Cooper"], "group": "congress", "typeLabel": "U.S. representative", "networks": ["Cooper"], "score": 1.5, "breakdown": {"tie": 0.5, "power": 0.5, "stance": 0.0}, "stanceLabel": "Supported the 2025 cuts", "stance_domain": "clerk.house.gov", "bridge": true, "ally": false}, {"id": "David Rouzer", "name": "David Rouzer", "type": "representative", "committee_assignments": "Transportation & Infrastructure; Agriculture; Science, Space & Technology", "stance_on_aid": "Voted YES on H.R. 4 (Rescissions Act of 2025).", "stance_source": "https://clerk.house.gov/Votes/2025203", "is_sitting_member": true, "is_nc_delegation": true, "aid_stance_known": true, "cross_party_with": ["Cooper"], "group": "congress", "typeLabel": "U.S. representative", "networks": ["Cooper"], "score": 1.5, "breakdown": {"tie": 0.5, "power": 0.5, "stance": 0.0}, "stanceLabel": "Supported the 2025 cuts", "stance_domain": "clerk.house.gov", "bridge": true, "ally": false}, {"id": "Richard Hudson", "name": "Richard Hudson", "type": "representative", "committee_assignments": "Energy & Commerce (Subcom. Communications & Technology, Chair)", "stance_on_aid": "Voted YES on H.R. 4 (Rescissions Act of 2025).", "stance_source": "https://clerk.house.gov/Votes/2025203", "is_sitting_member": true, "is_nc_delegation": true, "aid_stance_known": true, "cross_party_with": ["Cooper"], "group": "congress", "typeLabel": "U.S. representative", "networks": ["Cooper"], "score": 1.5, "breakdown": {"tie": 0.5, "power": 0.5, "stance": 0.0}, "stanceLabel": "Supported the 2025 cuts", "stance_domain": "clerk.house.gov", "bridge": true, "ally": false}, {"id": "Alma Adams", "name": "Alma Adams", "type": "representative", "committee_assignments": "Agriculture; Education & Labor", "stance_on_aid": "Voted NO on H.R. 4 (Rescissions Act of 2025).", "stance_source": "https://adams.house.gov/media-center/press-releases/rep-adams-votes-no-recissions-package-cuts-foreign-aid-and-public", "is_sitting_member": true, "is_nc_delegation": true, "aid_stance_known": true, "group": "congress", "typeLabel": "U.S. representative", "networks": ["Cooper"], "score": 3.5, "breakdown": {"tie": 1.5, "power": 0.5, "stance": 1.0}, "stanceLabel": "Supports aid or opposed the 2025 cuts", "stance_domain": "adams.house.gov", "bridge": false, "ally": true}, {"id": "Phil Berger", "name": "Phil Berger", "type": "state_official", "committee_assignments": "NC state official (not Congress)", "cross_party_with": ["Cooper"], "group": "state", "typeLabel": "State official or governor", "networks": ["Cooper"], "score": 3.5, "breakdown": {"tie": 2.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": true, "ally": false}, {"id": "DSCC", "name": "DSCC", "type": "party_org", "group": "party", "typeLabel": "Party organization", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Chuck Schumer", "name": "Chuck Schumer", "type": "senator", "committee_assignments": "Senate Democratic Leader", "stance_on_aid": "Voted NO on H.R. 4 (Rescissions Act of 2025), Senate roll call vote 411.", "stance_source": "https://www.senate.gov/legislative/LIS/roll_call_votes/vote1191/vote_119_1_00411.htm", "is_sitting_member": true, "aid_stance_known": true, "group": "congress", "typeLabel": "U.S. senator", "networks": ["Cooper"], "score": 4.0, "breakdown": {"tie": 1.5, "power": 1.0, "stance": 1.0}, "stanceLabel": "Supports aid or opposed the 2025 cuts", "stance_domain": "senate.gov", "bridge": false, "ally": true}, {"id": "Kirsten Gillibrand", "name": "Kirsten Gillibrand", "type": "senator", "committee_assignments": "Armed Services; Agriculture; Aging", "stance_on_aid": "Voted NO on H.R. 4 (Rescissions Act of 2025), Senate roll call vote 411.", "stance_source": "https://www.senate.gov/legislative/LIS/roll_call_votes/vote1191/vote_119_1_00411.htm", "is_sitting_member": true, "aid_stance_known": true, "group": "congress", "typeLabel": "U.S. senator", "networks": ["Cooper"], "score": 3.5, "breakdown": {"tie": 1.5, "power": 0.5, "stance": 1.0}, "stanceLabel": "Supports aid or opposed the 2025 cuts", "stance_domain": "senate.gov", "bridge": false, "ally": true}, {"id": "DGA", "name": "DGA", "type": "party_org", "group": "party", "typeLabel": "Party organization", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Joe Biden", "name": "Joe Biden", "type": "admin_official", "aid_stance_known": true, "group": "federal", "typeLabel": "Federal official", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "Mixed", "bridge": false, "ally": false}, {"id": "Kamala Harris", "name": "Kamala Harris", "type": "admin_official", "aid_stance_known": true, "group": "federal", "typeLabel": "Federal official", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "Mixed", "bridge": false, "ally": false}, {"id": "Pete Buttigieg", "name": "Pete Buttigieg", "type": "admin_official", "group": "federal", "typeLabel": "Federal official", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "AFGE", "name": "AFGE", "type": "party_org", "group": "party", "typeLabel": "Party organization", "networks": ["Cooper"], "score": 3.5, "breakdown": {"tie": 2.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Fumio Kishida", "name": "Fumio Kishida", "type": "diplomat", "group": "foreign", "typeLabel": "Diplomat or foreign official", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Rahm Emanuel", "name": "Rahm Emanuel", "type": "diplomat", "group": "foreign", "typeLabel": "Diplomat or foreign official", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Akio Toyoda (Toyota)", "name": "Akio Toyoda (Toyota)", "type": "business", "group": "business", "typeLabel": "Business", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Koji Sato (Toyota)", "name": "Koji Sato (Toyota)", "type": "business", "group": "business", "typeLabel": "Business", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "FUJIFILM (Teiichi Goto)", "name": "FUJIFILM (Teiichi Goto)", "type": "business", "group": "business", "typeLabel": "Business", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Shigeo Yamada", "name": "Shigeo Yamada", "type": "diplomat", "group": "foreign", "typeLabel": "Diplomat or foreign official", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Schneider Electric", "name": "Schneider Electric", "type": "business", "group": "business", "typeLabel": "Business", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Siemens AG", "name": "Siemens AG", "type": "business", "group": "business", "typeLabel": "Business", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Novartis", "name": "Novartis", "type": "business", "group": "business", "typeLabel": "Business", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Spencer Cox", "name": "Spencer Cox", "type": "state_official", "cross_party_with": ["Cooper"], "group": "state", "typeLabel": "State official or governor", "networks": ["Cooper"], "score": 1.5, "breakdown": {"tie": 0.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": true, "ally": false}, {"id": "Kevin Stitt", "name": "Kevin Stitt", "type": "state_official", "cross_party_with": ["Cooper"], "group": "state", "typeLabel": "State official or governor", "networks": ["Cooper"], "score": 1.5, "breakdown": {"tie": 0.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": true, "ally": false}, {"id": "Doug Burgum", "name": "Doug Burgum", "type": "admin_official", "cross_party_with": ["Cooper"], "group": "federal", "typeLabel": "Federal official", "networks": ["Cooper"], "score": 1.5, "breakdown": {"tie": 0.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": true, "ally": false}, {"id": "Donald Trump", "name": "Donald Trump", "type": "admin_official", "stance_on_aid": "Signed the Rescissions Act of 2025, which cut about $8 billion in foreign assistance.", "stance_source": "https://www.cbsnews.com/news/trump-signs-rescissions-package-foreign-aid-npr-pbs-funding/", "aid_stance_known": true, "cross_party_with": ["Cooper"], "group": "federal", "typeLabel": "Federal official", "networks": ["Cooper"], "score": 3.0, "breakdown": {"tie": 1.5, "power": 1.0, "stance": 0.0}, "stanceLabel": "Supported the 2025 cuts", "stance_domain": "cbsnews.com", "bridge": false, "ally": false}, {"id": "Le Thi Thu Thuy", "name": "Le Thi Thu Thuy", "type": "business", "group": "business", "typeLabel": "Business", "networks": ["Cooper"], "score": 2.5, "breakdown": {"tie": 1.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Tim Moore", "name": "Tim Moore", "type": "representative", "stance_on_aid": "Voted YES on H.R. 4 (Rescissions Act of 2025).", "stance_source": "https://clerk.house.gov/Votes/2025203", "is_sitting_member": true, "is_nc_delegation": true, "aid_stance_known": true, "cross_party_with": ["Cooper"], "group": "congress", "typeLabel": "U.S. representative", "networks": ["Cooper"], "score": 3.5, "breakdown": {"tie": 2.5, "power": 0.5, "stance": 0.0}, "stanceLabel": "Supported the 2025 cuts", "stance_domain": "clerk.house.gov", "bridge": true, "ally": false}, {"id": "Unifi (Greensboro/Yadkinville)", "name": "Unifi (Greensboro/Yadkinville)", "type": "business", "group": "business", "typeLabel": "Business", "networks": ["Cooper"], "score": 3.5, "breakdown": {"tie": 2.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Gildan Yarns / Eden", "name": "Gildan Yarns / Eden", "type": "business", "group": "business", "typeLabel": "Business", "networks": ["Cooper"], "score": 3.5, "breakdown": {"tie": 2.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Glen Raven / Norlina", "name": "Glen Raven / Norlina", "type": "business", "group": "business", "typeLabel": "Business", "networks": ["Cooper"], "score": 3.5, "breakdown": {"tie": 2.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "NC National Guard – Malawi SPP", "name": "NC National Guard – Malawi SPP", "type": "military", "group": "civic", "typeLabel": "Military partnership", "networks": ["Cooper"], "score": 3.5, "breakdown": {"tie": 2.5, "power": 0.0, "stance": 0.5}, "stanceLabel": "No public record", "bridge": false, "ally": false}, {"id": "Don Davis", "name": "Don Davis", "type": "representative", "committee_assignments": "House Armed Services; House Agriculture", "stance_on_aid": "Voted NO on H.R. 4 (Rescissions Act of 2025).", "stance_source": "https://clerk.house.gov/Votes/2025203", "is_sitting_member": true, "is_nc_delegation": true, "aid_stance_known": true, "group": "congress", "typeLabel": "U.S. representative", "networks": ["Cooper"], "score": 3.5, "breakdown": {"tie": 1.5, "power": 0.5, "stance": 1.0}, "stanceLabel": "Supports aid or opposed the 2025 cuts", "stance_domain": "clerk.house.gov", "bridge": false, "ally": true}], "links": [{"id": "L0", "source": "Roy Cooper", "target": "Thom Tillis", "rels": ["r0", "r27"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L1", "source": "Roy Cooper", "target": "Ted Budd", "rels": ["r1", "r28"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L2", "source": "Roy Cooper", "target": "Chuck Edwards", "rels": ["r2", "r34"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 3.0}, {"id": "L3", "source": "Roy Cooper", "target": "Deborah Ross", "rels": ["r3", "r35", "r42"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 3.5}, {"id": "L4", "source": "Roy Cooper", "target": "Valerie Foushee", "rels": ["r4", "r44"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 3.5}, {"id": "L5", "source": "Roy Cooper", "target": "Virginia Foxx", "rels": ["r5"], "network": "Cooper", "valence": "positive", "tie": 0.5, "score": 1.5}, {"id": "L6", "source": "Roy Cooper", "target": "David Rouzer", "rels": ["r6"], "network": "Cooper", "valence": "positive", "tie": 0.5, "score": 1.5}, {"id": "L7", "source": "Roy Cooper", "target": "Richard Hudson", "rels": ["r7"], "network": "Cooper", "valence": "positive", "tie": 0.5, "score": 1.5}, {"id": "L8", "source": "Roy Cooper", "target": "Alma Adams", "rels": ["r8", "r43"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 3.5}, {"id": "L9", "source": "Roy Cooper", "target": "Phil Berger", "rels": ["r9", "r37"], "network": "Cooper", "valence": "positive", "tie": 2.5, "score": 3.5}, {"id": "L10", "source": "Roy Cooper", "target": "DSCC", "rels": ["r10"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L11", "source": "Roy Cooper", "target": "Chuck Schumer", "rels": ["r11"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 4.0}, {"id": "L12", "source": "Roy Cooper", "target": "Kirsten Gillibrand", "rels": ["r12"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 3.5}, {"id": "L13", "source": "Roy Cooper", "target": "DGA", "rels": ["r13"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L14", "source": "Roy Cooper", "target": "Joe Biden", "rels": ["r14"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L15", "source": "Roy Cooper", "target": "Kamala Harris", "rels": ["r15"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L16", "source": "Roy Cooper", "target": "Pete Buttigieg", "rels": ["r16"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L17", "source": "Roy Cooper", "target": "AFGE", "rels": ["r17"], "network": "Cooper", "valence": "positive", "tie": 2.5, "score": 3.5}, {"id": "L18", "source": "Roy Cooper", "target": "Fumio Kishida", "rels": ["r18"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L19", "source": "Roy Cooper", "target": "Rahm Emanuel", "rels": ["r19"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L20", "source": "Roy Cooper", "target": "Akio Toyoda (Toyota)", "rels": ["r20"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L21", "source": "Roy Cooper", "target": "Koji Sato (Toyota)", "rels": ["r21"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L22", "source": "Roy Cooper", "target": "FUJIFILM (Teiichi Goto)", "rels": ["r22"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L23", "source": "Roy Cooper", "target": "Shigeo Yamada", "rels": ["r23"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L24", "source": "Roy Cooper", "target": "Schneider Electric", "rels": ["r24"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L25", "source": "Roy Cooper", "target": "Siemens AG", "rels": ["r25"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L26", "source": "Roy Cooper", "target": "Novartis", "rels": ["r26"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L27", "source": "Roy Cooper", "target": "Spencer Cox", "rels": ["r29"], "network": "Cooper", "valence": "positive", "tie": 0.5, "score": 1.5}, {"id": "L28", "source": "Roy Cooper", "target": "Kevin Stitt", "rels": ["r30"], "network": "Cooper", "valence": "positive", "tie": 0.5, "score": 1.5}, {"id": "L29", "source": "Roy Cooper", "target": "Doug Burgum", "rels": ["r31"], "network": "Cooper", "valence": "positive", "tie": 0.5, "score": 1.5}, {"id": "L30", "source": "Roy Cooper", "target": "Donald Trump", "rels": ["r32"], "network": "Cooper", "valence": "adversarial", "tie": 1.5, "score": 3.0}, {"id": "L31", "source": "Roy Cooper", "target": "Le Thi Thu Thuy", "rels": ["r33"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 2.5}, {"id": "L32", "source": "Roy Cooper", "target": "Tim Moore", "rels": ["r36", "r46", "r47"], "network": "Cooper", "valence": "positive", "tie": 2.5, "score": 3.5}, {"id": "L33", "source": "Roy Cooper", "target": "Unifi (Greensboro/Yadkinville)", "rels": ["r38"], "network": "Cooper", "valence": "positive", "tie": 2.5, "score": 3.5}, {"id": "L34", "source": "Roy Cooper", "target": "Gildan Yarns / Eden", "rels": ["r39"], "network": "Cooper", "valence": "positive", "tie": 2.5, "score": 3.5}, {"id": "L35", "source": "Roy Cooper", "target": "Glen Raven / Norlina", "rels": ["r40"], "network": "Cooper", "valence": "positive", "tie": 2.5, "score": 3.5}, {"id": "L36", "source": "Roy Cooper", "target": "NC National Guard – Malawi SPP", "rels": ["r41"], "network": "Cooper", "valence": "positive", "tie": 2.5, "score": 3.5}, {"id": "L37", "source": "Roy Cooper", "target": "Don Davis", "rels": ["r45"], "network": "Cooper", "valence": "positive", "tie": 1.5, "score": 3.5}], "rels": [{"id": "r0", "a": "Roy Cooper", "b": "Thom Tillis", "network": "Cooper", "category": "Disaster response", "detail": "Disaster aid coordination", "valence": "positive", "period": "2024", "evidence": "Named in the governor’s Nov 20, 2024 announcement of Washington meetings on his Hurricane Helene federal funding request.", "url": "https://governor.nc.gov/news/press-releases/2024/11/20/governor-cooper-travel-washington-dc-present-request-more-25-billion-federal-funding-helene-recovery", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.5, "stance": 0.0, "score": 2.5, "care_role": null}, {"id": "r1", "a": "Roy Cooper", "b": "Ted Budd", "network": "Cooper", "category": "Disaster response", "detail": "Disaster aid coordination", "valence": "positive", "period": "2024", "evidence": "Named in the governor’s Nov 20, 2024 announcement of Washington meetings on his Hurricane Helene federal funding request.", "url": "https://governor.nc.gov/news/press-releases/2024/11/20/governor-cooper-travel-washington-dc-present-request-more-25-billion-federal-funding-helene-recovery", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.5, "stance": 0.0, "score": 2.5, "care_role": null}, {"id": "r2", "a": "Roy Cooper", "b": "Chuck Edwards", "network": "Cooper", "category": "Disaster response", "detail": "Disaster aid coordination", "valence": "positive", "period": "2024", "evidence": "Named in the governor’s Nov 20, 2024 announcement of Washington meetings on his Hurricane Helene federal funding request.", "url": "https://governor.nc.gov/news/press-releases/2024/11/20/governor-cooper-travel-washington-dc-present-request-more-25-billion-federal-funding-helene-recovery", "domain": "governor.nc.gov", "tie": 1.5, "power": 1.0, "stance": 0.0, "score": 3.0, "care_role": null}, {"id": "r3", "a": "Roy Cooper", "b": "Deborah Ross", "network": "Cooper", "category": "Legislative and governing", "detail": "Federal initiatives", "valence": "positive", "period": "2023", "evidence": "Dec 11, 2023: took part in the S-Line rail grant event with Cooper and Secretary Buttigieg.", "url": "https://governor.nc.gov/news/press-releases/2023/12/11/governor-cooper-joins-us-dot-secretary-pete-buttigieg-celebrate-record-breaking-grant-s-line", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.5, "stance": 1.0, "score": 3.5, "care_role": null}, {"id": "r4", "a": "Roy Cooper", "b": "Valerie Foushee", "network": "Cooper", "category": "Legislative and governing", "detail": "Economic development", "valence": "positive", "period": "2022", "evidence": "Mar 29, 2022: named in the governor’s VinFast North Carolina plant announcement.", "url": "https://governor.nc.gov/news/press-releases/2022/03/29/governor-cooper-announces-vinfast-automotive-selects-north-carolina-electric-vehicle-assembly-plant", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.5, "stance": 1.0, "score": 3.5, "care_role": null}, {"id": "r5", "a": "Roy Cooper", "b": "Virginia Foxx", "network": "Cooper", "category": "Disaster response", "detail": "Delegation disaster aid", "valence": "positive", "period": "2017-2018", "evidence": "Recipient, as a 2017 NC delegation member, of Cooper's $929M Hurricane Matthew supplemental aid request (letter credits delegation's prior advocacy). Weak tie: addressed to whole delegation, not individually.", "url": "https://governor.nc.gov/documents/files/federal-request-hurricane-matthew-relief/open", "domain": "governor.nc.gov", "tie": 0.5, "power": 0.5, "stance": 0.0, "score": 1.5, "care_role": null}, {"id": "r6", "a": "Roy Cooper", "b": "David Rouzer", "network": "Cooper", "category": "Disaster response", "detail": "Delegation disaster aid", "valence": "positive", "period": "2017-2018", "evidence": "Recipient, as a 2017 NC delegation member, of Cooper's $929M Hurricane Matthew supplemental aid request (letter credits delegation's prior advocacy). Weak tie: addressed to whole delegation, not individually.", "url": "https://governor.nc.gov/documents/files/federal-request-hurricane-matthew-relief/open", "domain": "governor.nc.gov", "tie": 0.5, "power": 0.5, "stance": 0.0, "score": 1.5, "care_role": null}, {"id": "r7", "a": "Roy Cooper", "b": "Richard Hudson", "network": "Cooper", "category": "Disaster response", "detail": "Delegation disaster aid", "valence": "positive", "period": "2017-2018", "evidence": "Recipient, as a 2017 NC delegation member, of Cooper's $929M Hurricane Matthew supplemental aid request (letter credits delegation's prior advocacy). Weak tie: addressed to whole delegation, not individually.", "url": "https://governor.nc.gov/documents/files/federal-request-hurricane-matthew-relief/open", "domain": "governor.nc.gov", "tie": 0.5, "power": 0.5, "stance": 0.0, "score": 1.5, "care_role": null}, {"id": "r8", "a": "Roy Cooper", "b": "Alma Adams", "network": "Cooper", "category": "Disaster response", "detail": "Delegation disaster aid", "valence": "positive", "period": "2017-2018", "evidence": "Recipient, as a 2017 NC delegation member, of Cooper's $929M Hurricane Matthew supplemental aid request (letter credits delegation's prior advocacy). Weak tie: addressed to whole delegation, not individually.", "url": "https://governor.nc.gov/documents/files/federal-request-hurricane-matthew-relief/open", "domain": "governor.nc.gov", "tie": 0.5, "power": 0.5, "stance": 1.0, "score": 2.5, "care_role": null}, {"id": "r9", "a": "Roy Cooper", "b": "Phil Berger", "network": "Cooper", "category": "Legislative and governing", "detail": "Legislated together / adversarial", "valence": "positive", "period": "2023", "evidence": "Mar 27, 2023: stood with Cooper at the Medicaid expansion bill signing.", "url": "https://apnews.com/article/north-carolina-medicaid-expansion-roy-cooper-legislature-f00242e5883bccf816a679a76584a5f9", "domain": "apnews.com", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r10", "a": "Roy Cooper", "b": "DSCC", "network": "Cooper", "category": "Campaign and endorsement", "detail": "Recruitment / campaign support", "valence": "positive", "period": "2025-2026", "evidence": "Schumer/Gillibrand welcome statement; 2026 race statement", "url": "https://www.dscc.org/article/statement-from-senate-minority-leader-chuck-schumer-and-dscc-chair-kirsten-gillibrand-on-north-carolina-senate-race/", "domain": "dscc.org", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r11", "a": "Roy Cooper", "b": "Chuck Schumer", "network": "Cooper", "category": "Campaign and endorsement", "detail": "Recruitment / campaign support", "valence": "positive", "period": "2025", "evidence": "Joined the DSCC statement welcoming Cooper’s Senate candidacy.", "url": "https://www.dscc.org/article/statement-from-senate-minority-leader-chuck-schumer-and-dscc-chair-kirsten-gillibrand-on-north-carolina-senate-race/", "domain": "dscc.org", "tie": 1.5, "power": 1.0, "stance": 1.0, "score": 4.0, "care_role": null}, {"id": "r12", "a": "Roy Cooper", "b": "Kirsten Gillibrand", "network": "Cooper", "category": "Campaign and endorsement", "detail": "Recruitment / campaign support", "valence": "positive", "period": "2025-2026", "evidence": "DSCC chair publicly welcomed Cooper", "url": "https://www.dscc.org/article/statement-from-senate-minority-leader-chuck-schumer-and-dscc-chair-kirsten-gillibrand-on-north-carolina-senate-race/", "domain": "dscc.org", "tie": 1.5, "power": 0.5, "stance": 1.0, "score": 3.5, "care_role": null}, {"id": "r13", "a": "Roy Cooper", "b": "DGA", "network": "Cooper", "category": "Campaign and endorsement", "detail": "Party leadership", "valence": "positive", "period": "2021-2022", "evidence": "Chosen DGA chair for 2022", "url": "https://democraticgovernors.org/updates/democratic-governors-select-gov-roy-cooper-as-next-dga-chair/", "domain": "democraticgovernors.org", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r14", "a": "Roy Cooper", "b": "Joe Biden", "network": "Cooper", "category": "Legislative and governing", "detail": "Federal state initiatives", "valence": "positive", "period": "2024", "evidence": "Oct 2, 2024: surveyed Hurricane Helene damage with Cooper by air.", "url": "https://governor.nc.gov/news/press-releases/2024/10/02/photos-available-governor-cooper-and-president-biden-survey-damage-hurricane-helene-during-aerial", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r15", "a": "Roy Cooper", "b": "Kamala Harris", "network": "Cooper", "category": "Professional", "detail": "Worked together / VP consideration", "valence": "positive", "period": "2024", "evidence": "July 2024: Cooper withdrew from consideration as Harris’s running mate.", "url": "https://www.cnn.com/2024/07/29/politics/harris-vice-president-roy-cooper/index.html", "domain": "cnn.com", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r16", "a": "Roy Cooper", "b": "Pete Buttigieg", "network": "Cooper", "category": "Legislative and governing", "detail": "Infrastructure", "valence": "positive", "period": "2023", "evidence": "Dec 11, 2023: celebrated a record S-Line rail grant with Cooper.", "url": "https://governor.nc.gov/news/press-releases/2023/12/11/governor-cooper-joins-us-dot-secretary-pete-buttigieg-celebrate-record-breaking-grant-s-line", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r17", "a": "Roy Cooper", "b": "AFGE", "network": "Cooper", "category": "Campaign and endorsement", "detail": "Endorsement", "valence": "positive", "period": "2026", "evidence": "Senate endorsement Feb 2026", "url": "https://www.afge.org/publication/largest-federal-employee-union-endorses-roy-cooper-for-election-to-the-us-senate/", "domain": "afge.org", "tie": 2.5, "power": 0.0, "stance": 0.5, "score": 3.5, "care_role": null}, {"id": "r18", "a": "Roy Cooper", "b": "Fumio Kishida", "network": "Cooper", "category": "Business recruitment", "detail": "Foreign engagement / state visit", "valence": "positive", "period": "2024", "evidence": "State lunch; Toyota and HondaJet visits", "url": "https://governor.nc.gov/news/press-releases/2024/04/12/updated-pool-reportfootagephotos-available-governor-and-mrs-cooper-host-state-lunch-honoring-prime", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r19", "a": "Roy Cooper", "b": "Rahm Emanuel", "network": "Cooper", "category": "Business recruitment", "detail": "Economic diplomacy", "valence": "positive", "period": "2023", "evidence": "Named in the governor’s release on the 2023 Southeast U.S./Japan economic summit delegation.", "url": "https://governor.nc.gov/news/press-releases/2023/10/16/north-carolina-delegation-attends-southeast-usjapan-economic-summit-encourages-investment-north", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r20", "a": "Roy Cooper", "b": "Akio Toyoda (Toyota)", "network": "Cooper", "category": "Business recruitment", "detail": "Business recruitment", "valence": "positive", "period": "2023", "evidence": "Toyota chairman meeting", "url": "https://governor.nc.gov/news/press-releases/2023/10/16/north-carolina-delegation-attends-southeast-usjapan-economic-summit-encourages-investment-north", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r21", "a": "Roy Cooper", "b": "Koji Sato (Toyota)", "network": "Cooper", "category": "Business recruitment", "detail": "Business recruitment", "valence": "positive", "period": "2023", "evidence": "Toyota president meeting; NC investment announcement", "url": "https://governor.nc.gov/news/press-releases/2023/10/16/north-carolina-delegation-attends-southeast-usjapan-economic-summit-encourages-investment-north", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r22", "a": "Roy Cooper", "b": "FUJIFILM (Teiichi Goto)", "network": "Cooper", "category": "Business recruitment", "detail": "Business recruitment", "valence": "positive", "period": "2023", "evidence": "Meeting on NC facilities", "url": "https://governor.nc.gov/news/press-releases/2023/10/16/north-carolina-delegation-attends-southeast-usjapan-economic-summit-encourages-investment-north", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r23", "a": "Roy Cooper", "b": "Shigeo Yamada", "network": "Cooper", "category": "Business recruitment", "detail": "Diplomatic engagement", "valence": "positive", "period": "2024", "evidence": "Hosted Japanese ambassador at SEUS/Japan", "url": "https://governor.nc.gov/news/press-releases/2024/10/28/governor-cooper-hosts-japanese-ambassador-us-and-senior-japanese-business-leaders-46th-annual", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r24", "a": "Roy Cooper", "b": "Schneider Electric", "network": "Cooper", "category": "Business recruitment", "detail": "Business recruitment", "valence": "positive", "period": "2024", "evidence": "France meeting", "url": "https://governor.nc.gov/news/press-releases/2024/05/24/governor-cooper-travels-france-economic-development-trip", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r25", "a": "Roy Cooper", "b": "Siemens AG", "network": "Cooper", "category": "Business recruitment", "detail": "Business recruitment", "valence": "positive", "period": "2024", "evidence": "Germany meeting", "url": "https://governor.nc.gov/news/press-releases/2024/05/28/governor-cooper-travels-germany-economic-development-trip", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r26", "a": "Roy Cooper", "b": "Novartis", "network": "Cooper", "category": "Business recruitment", "detail": "Business recruitment", "valence": "positive", "period": "2024", "evidence": "Switzerland meeting", "url": "https://governor.nc.gov/news/press-releases/2024/05/30/governor-cooper-travels-switzerland-economic-development-trip", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r27", "a": "Roy Cooper", "b": "Thom Tillis", "network": "Cooper", "category": "Disaster response", "detail": "Matthew delegation request", "valence": "positive", "period": "2017", "evidence": "Recipient, as a 2017 NC delegation member, of Cooper's $929M Hurricane Matthew supplemental aid request (letter credits delegation's prior advocacy). Weak tie: addressed to whole delegation, not individually.", "url": "https://governor.nc.gov/documents/files/federal-request-hurricane-matthew-relief/open", "domain": "governor.nc.gov", "tie": 0.5, "power": 0.5, "stance": 0.0, "score": 1.5, "care_role": null}, {"id": "r28", "a": "Roy Cooper", "b": "Ted Budd", "network": "Cooper", "category": "Disaster response", "detail": "Matthew delegation request", "valence": "positive", "period": "2017", "evidence": "Recipient, as a 2017 NC delegation member (then U.S. House), of Cooper's $929M Hurricane Matthew supplemental aid request (letter credits delegation's prior advocacy). Weak tie: addressed to whole delegation, not individually.", "url": "https://governor.nc.gov/documents/files/federal-request-hurricane-matthew-relief/open", "domain": "governor.nc.gov", "tie": 0.5, "power": 0.5, "stance": 0.0, "score": 1.5, "care_role": null}, {"id": "r29", "a": "Roy Cooper", "b": "Spencer Cox", "network": "Cooper", "category": "Legislative and governing", "detail": "NGA executive committee", "valence": "positive", "period": "2023", "evidence": "July 14, 2023: Cox elected NGA chair; Cooper on same Executive Committee", "url": "https://governor.utah.gov/press/utah-gov-spencer-j-cox-elected-chair-of-national-governors-association-launches-disagree-better-initiative/", "domain": "governor.utah.gov", "tie": 0.5, "power": 0.0, "stance": 0.5, "score": 1.5, "care_role": null}, {"id": "r30", "a": "Roy Cooper", "b": "Kevin Stitt", "network": "Cooper", "category": "Legislative and governing", "detail": "NGA executive committee", "valence": "positive", "period": "2022-2023", "evidence": "July 15, 2022: Cooper elected to NGA Executive Committee alongside Stitt", "url": "https://nsjonline.com/article/2022/07/cooper-elected-governors-executive-committee/", "domain": "nsjonline.com", "tie": 0.5, "power": 0.0, "stance": 0.5, "score": 1.5, "care_role": null}, {"id": "r31", "a": "Roy Cooper", "b": "Doug Burgum", "network": "Cooper", "category": "Legislative and governing", "detail": "NGA executive committee", "valence": "positive", "period": "2022", "evidence": "July 15, 2022: Cooper elected to NGA Executive Committee alongside Burgum (now Interior Secretary)", "url": "https://nsjonline.com/article/2022/07/cooper-elected-governors-executive-committee/", "domain": "nsjonline.com", "tie": 0.5, "power": 0.0, "stance": 0.5, "score": 1.5, "care_role": null}, {"id": "r32", "a": "Roy Cooper", "b": "Donald Trump", "network": "Cooper", "category": "Disaster response", "detail": "Adversarial helene", "valence": "adversarial", "period": "2024", "evidence": "Oct 21, 2024: Cooper asked Trump not to spread lies or misinformation during Swannanoa visit", "url": "https://wlos.com/news/local/north-carolina-roy-cooper-fema-administrator-deanne-criswell-asheville-community-care-station-tunnel-road-helene-recovery-storm-damage-response", "domain": "wlos.com", "tie": 1.5, "power": 1.0, "stance": 0.0, "score": 3.0, "care_role": null}, {"id": "r33", "a": "Roy Cooper", "b": "Le Thi Thu Thuy", "network": "Cooper", "category": "Business recruitment", "detail": "Business recruitment vinfast", "valence": "positive", "period": "2022", "evidence": "Mar 29, 2022: VinFast $4B, 7,500-job Chatham County plant announcement", "url": "https://governor.nc.gov/news/press-releases/2022/03/29/governor-cooper-announces-vinfast-automotive-selects-north-carolina-electric-vehicle-assembly-plant", "domain": "governor.nc.gov", "tie": 1.5, "power": 0.0, "stance": 0.5, "score": 2.5, "care_role": null}, {"id": "r34", "a": "Roy Cooper", "b": "Chuck Edwards", "network": "Cooper", "category": "Disaster response", "detail": "Helene survey and friction", "valence": "positive", "period": "2024", "evidence": "Sept 30, 2024: joined Cooper at an Asheville airport news conference on Hurricane Helene.", "url": "https://governor.nc.gov/news/press-releases/2024/09/30/photovideo-available-governor-cooper-travels-western-nc-survey-storm-damage-hurricane-helene", "domain": "governor.nc.gov", "tie": 1.5, "power": 1.0, "stance": 0.0, "score": 3.0, "care_role": null}, {"id": "r35", "a": "Roy Cooper", "b": "Deborah Ross", "network": "Cooper", "category": "Disaster response", "detail": "Helene delegation letter lead", "valence": "positive", "period": "2024", "evidence": "Led Nov 22, 2024 NC Democratic delegation letter urging House leaders to fully meet Cooper's $25.57B Helene request", "url": "https://ross.house.gov/press-releases?ID=498B43CB-C271-4A2E-A27B-3026353CDF02", "domain": "ross.house.gov", "tie": 1.5, "power": 0.5, "stance": 1.0, "score": 3.5, "care_role": null}, {"id": "r36", "a": "Roy Cooper", "b": "Tim Moore", "network": "Cooper", "category": "Legislative and governing", "detail": "HB2 repeal compromise", "valence": "positive", "period": "2017", "evidence": "Mar 30, 2017: Cooper signed the HB2 repeal compromise; House Speaker Moore publicly described the deal as a “very measured approach.”", "url": "https://www.wunc.org/politics/2017-03-30/nc-gov-roy-cooper-signs-compromise-bill-repealing-hb2", "domain": "wunc.org", "tie": 2.5, "power": 0.5, "stance": 0.0, "score": 3.5, "care_role": null}, {"id": "r37", "a": "Roy Cooper", "b": "Phil Berger", "network": "Cooper", "category": "Legislative and governing", "detail": "HB951 energy deal", "valence": "positive", "period": "2021", "evidence": "Oct 1, 2021: Cooper-Berger-Moore three-way HB 951 energy compromise announced", "url": "https://www.wunc.org/environment/2021-10-01/gov-cooper-gop-leaders-reach-deal-over-contentious-energy-bill", "domain": "wunc.org", "tie": 2.5, "power": 0.0, "stance": 0.5, "score": 3.5, "care_role": null}, {"id": "r38", "a": "Roy Cooper", "b": "Unifi (Greensboro/Yadkinville)", "network": "Cooper", "category": "Business recruitment", "detail": "Repreve plant tour", "valence": "positive", "period": "2018", "evidence": "Jan 16, 2018: toured Repreve recycled-fiber plant in Yadkinville. Said \"Unifi is one of those companies that does provide those jobs\"", "url": "https://www.recyclingtoday.com/news/unifi-hosts-north-carolina-governor-roy-cooper/", "domain": "recyclingtoday.com", "tie": 2.5, "power": 0.0, "stance": 0.5, "score": 3.5, "care_role": null}, {"id": "r39", "a": "Roy Cooper", "b": "Gildan Yarns / Eden", "network": "Cooper", "category": "Business recruitment", "detail": "Gildan eden expansion", "valence": "positive", "period": "2019", "evidence": "Oct 2019: Cooper announced Gildan Yarns’ Eden mill (85 jobs), supported by a $250,000 One North Carolina Fund grant.", "url": "https://www.commerce.nc.gov/news/press-releases/textile-manufacturer-invest-5-million-eden", "domain": "commerce.nc.gov", "tie": 2.5, "power": 0.0, "stance": 0.5, "score": 3.5, "care_role": null}, {"id": "r40", "a": "Roy Cooper", "b": "Glen Raven / Norlina", "network": "Cooper", "category": "Business recruitment", "detail": "Glen raven norlina expansion", "valence": "positive", "period": "2021", "evidence": "Jul 21, 2021: announced 205-job, $82M Norlina expansion", "url": "https://www.textileworld.com/textile-world/2021/07/glen-raven-selects-warren-county-nc-for-major-expansion/", "domain": "textileworld.com", "tie": 2.5, "power": 0.0, "stance": 0.5, "score": 3.5, "care_role": null}, {"id": "r41", "a": "Roy Cooper", "b": "NC National Guard – Malawi SPP", "network": "Cooper", "category": "Legislative and governing", "detail": "Malawi spp authorization", "valence": "positive", "period": "2023-2024", "evidence": "Governor’s chief of staff Kristi Jones signed the letter of intent for the NC–Malawi State Partnership Program on Apr 27, 2024. President Chakwera publicly thanked “Governor Cooper, in particular.”", "url": "https://www.africom.mil/article/35486/north-carolina-national-guard-welcomes-malawi-as-their-new-state-partners", "domain": "africom.mil", "tie": 2.5, "power": 0.0, "stance": 0.5, "score": 3.5, "care_role": null}, {"id": "r42", "a": "Roy Cooper", "b": "Deborah Ross", "network": "Cooper", "category": "Disaster response", "detail": "Helene letter signatory", "valence": "positive", "period": "2024", "evidence": "Nov 22, 2024: led and signed a letter to Speaker Johnson supporting Governor Cooper’s Hurricane Helene federal funding request.", "url": "https://ross.house.gov/_cache/files/3/e/3e24527f-4c41-442c-9887-248b019658e8/C275DA152F94BEF092E215E7CD8631FD.helene-cooper-request-letter-november-2024-final.pdf", "domain": "ross.house.gov", "tie": 1.5, "power": 0.5, "stance": 1.0, "score": 3.5, "care_role": null}, {"id": "r43", "a": "Roy Cooper", "b": "Alma Adams", "network": "Cooper", "category": "Disaster response", "detail": "Helene letter signatory", "valence": "positive", "period": "2024", "evidence": "Nov 22, 2024: signed a letter to Speaker Johnson supporting Governor Cooper’s Hurricane Helene federal funding request.", "url": "https://ross.house.gov/_cache/files/3/e/3e24527f-4c41-442c-9887-248b019658e8/C275DA152F94BEF092E215E7CD8631FD.helene-cooper-request-letter-november-2024-final.pdf", "domain": "ross.house.gov", "tie": 1.5, "power": 0.5, "stance": 1.0, "score": 3.5, "care_role": null}, {"id": "r44", "a": "Roy Cooper", "b": "Valerie Foushee", "network": "Cooper", "category": "Disaster response", "detail": "Helene letter signatory", "valence": "positive", "period": "2024", "evidence": "Nov 22, 2024: signed a letter to Speaker Johnson supporting Governor Cooper’s Hurricane Helene federal funding request.", "url": "https://ross.house.gov/_cache/files/3/e/3e24527f-4c41-442c-9887-248b019658e8/C275DA152F94BEF092E215E7CD8631FD.helene-cooper-request-letter-november-2024-final.pdf", "domain": "ross.house.gov", "tie": 1.5, "power": 0.5, "stance": 1.0, "score": 3.5, "care_role": null}, {"id": "r45", "a": "Roy Cooper", "b": "Don Davis", "network": "Cooper", "category": "Disaster response", "detail": "Helene letter signatory", "valence": "positive", "period": "2024", "evidence": "Nov 22, 2024: signed a letter to Speaker Johnson supporting Governor Cooper’s Hurricane Helene federal funding request.", "url": "https://ross.house.gov/_cache/files/3/e/3e24527f-4c41-442c-9887-248b019658e8/C275DA152F94BEF092E215E7CD8631FD.helene-cooper-request-letter-november-2024-final.pdf", "domain": "ross.house.gov", "tie": 1.5, "power": 0.5, "stance": 1.0, "score": 3.5, "care_role": null}, {"id": "r46", "a": "Roy Cooper", "b": "Tim Moore", "network": "Cooper", "category": "Legislative and governing", "detail": "Legislated together", "valence": "positive", "period": "2021", "evidence": "Oct 1, 2021: Cooper, Senate Leader Berger and Speaker Moore announced the HB 951 energy compromise in a joint news release.", "url": "https://www.wunc.org/environment/2021-10-01/gov-cooper-gop-leaders-reach-deal-over-contentious-energy-bill", "domain": "wunc.org", "tie": 2.5, "power": 0.5, "stance": 0.0, "score": 3.5, "care_role": null}, {"id": "r47", "a": "Roy Cooper", "b": "Tim Moore", "network": "Cooper", "category": "Legislative and governing", "detail": "Legislated together", "valence": "positive", "period": "2023", "evidence": "Mar 27, 2023: stood with Cooper at the Medicaid expansion bill signing.", "url": "https://apnews.com/article/north-carolina-medicaid-expansion-roy-cooper-legislature-f00242e5883bccf816a679a76584a5f9", "domain": "apnews.com", "tie": 1.5, "power": 0.5, "stance": 0.0, "score": 2.5, "care_role": null}], "facts": []};
 
-/* =========================================================
-   ROLES LOOKUP
-   ========================================================= */
-const ROLES = {
-  'Thom Tillis': 'U.S. Senator (R-NC), outgoing',
-  'Ted Budd': 'U.S. Senator (R-NC)',
-  'Chuck Edwards': 'U.S. Rep. (R-NC-11), Approps',
-  'Deborah Ross': 'U.S. Rep. (D-NC-2)',
-  'Valerie Foushee': 'U.S. Rep. (D-NC-4)',
-  'Virginia Foxx': 'U.S. Rep. (R-NC-5), Rules Chair',
-  'David Rouzer': 'U.S. Rep. (R-NC-7)',
-  'Richard Hudson': 'U.S. Rep. (R-NC-9), NRCC Chair',
-  'Alma Adams': 'U.S. Rep. (D-NC-12)',
-  'Tim Moore': 'U.S. Rep. (R-NC-14)',
-  'Don Davis': 'U.S. Rep. (D-NC-1)',
-  'Chuck Schumer': 'Senate Democratic Leader',
-  'Kirsten Gillibrand': 'U.S. Senator (D-NY)',
-  'Phil Berger': 'NC Senate President Pro Tem (R)',
-  'Donald Trump': 'U.S. President',
-  'Doug Burgum': 'Secretary of the Interior',
-  'Spencer Cox': 'Governor of Utah (R)',
-  'Kevin Stitt': 'Governor of Oklahoma (R)',
+const GROUPS = {
+  congress:{label:'Members of Congress', color:'#E6EDF7'},
+  federal:{label:'Federal officials', color:'#FFB547'},
+  state:{label:'State officials and governors', color:'#B49BFF'},
+  business:{label:'Businesses', color:'#2ED3B7'},
+  party:{label:'Party organizations and unions', color:'#FF7BC5'},
+  foreign:{label:'Diplomats and foreign officials', color:'#7FD4FF'},
+  civic:{label:'Nonprofits, faith and military', color:'#D9C08A'}
 };
+const CAND = {'Roy Cooper':{color:'#4C8DFF', key:'Cooper'}, 'Michael Whatley':{color:'#FF5468', key:'Whatley'}};
+const ADV = '#FF8A5C', GREY = '#8C97A8';
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/* =========================================================
-   EXCLUSION LISTS (for allies/bridges)
-   ========================================================= */
-const ORGS_EXCLUDE = new Set([
-  'DSCC','DGA','AFGE',
-  'Schneider Electric','Siemens AG','Novartis',
-  'Gildan Yarns / Eden','Glen Raven / Norlina',
-  'Unifi (Greensboro/Yadkinville)',
-  'NC National Guard – Malawi SPP',
-  'FUJIFILM (Teiichi Goto)','Akio Toyoda (Toyota)','Koji Sato (Toyota)',
-  'Rahm Emanuel','Le Thi Thu Thuy','Fumio Kishida','Shigeo Yamada',
-]);
-const FORMER_EXCLUDE = new Set(['Joe Biden','Kamala Harris','Pete Buttigieg']);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl = u => (typeof u === 'string' && /^https?:\/\//i.test(u)) ? u : null;
+const clamp = (v,a=0,b=1) => Math.max(a, Math.min(b, v));
+function rgba(hex, a){ const h=hex.replace('#',''); const n=parseInt(h,16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+const ext = '<svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2h6v6M10 2 3 9" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';
+function srcLink(url, label){ const u = safeUrl(url); if(!u) return '<span class="small">No link</span>'; let d=label; if(!d){ try{ d=new URL(u).hostname.replace(/^www\./,''); }catch(e){ d='Source'; } } return `<a class="src" href="${esc(u)}" target="_blank" rel="noopener">${esc(d)} ${ext}</a>`; }
 
-/* =========================================================
-   NODE / EDGE COLORS
-   ========================================================= */
-const NODE_COLORS = {
-  candidate:      '#3b82f6',
-  senator:        '#22d3ee',
-  representative: '#22d3ee',
-  state_official: '#94a3b8',
-  party_org:      '#a855f7',
-  admin_official: '#f97316',
-  business:       '#10b981',
-  diplomat:       '#eab308',
-  military:       '#3b82f6',
-};
-const REL_COLORS = {
-  'disaster_response':     '#ef4444',
-  'legislative/governing': '#3b82f6',
-  'campaign/endorsement':  '#a855f7',
-  'business_recruitment':  '#10b981',
-  'professional':          '#f97316',
-};
+/* ---------- data prep ---------- */
+const rels = DATA.rels;
+const relById = new Map(rels.map(r => [r.id, r]));
+const nodes = DATA.nodes.map(n => ({...n}));
+const byId = new Map(nodes.map(n => [n.id, n]));
+nodes.forEach(n => {
+  n.isCand = n.group === 'candidate';
+  n.color = n.isCand ? CAND[n.id].color : GROUPS[n.group].color;
+  n.r = n.isCand ? 19 : 3.6 + (n.score || 1.5) * 1.55;
+  n.home = n.isCand ? CAND[n.id].key : (n.networks.length === 2 ? 'both' : (n.networks[0] || 'Whatley'));
+});
+const links = DATA.links.map(l => ({...l}));
+links.forEach((l,i) => {
+  const s = byId.get(l.source);
+  l.color = l.valence === 'adversarial' ? ADV : (s && s.isCand ? s.color : GREY);
+  l.count = l.tie >= 2.5 ? 3 : l.tie >= 1.5 ? 2 : 1;
+  l.speed = 0.00011 + l.tie * 0.00004;
+  l.phase = (i * 0.137) % 1;
+});
+const incident = new Map(nodes.map(n => [n.id, []]));
+links.forEach(l => { incident.get(l.source).push(l); incident.get(l.target).push(l); });
 
-/* =========================================================
-   CSV PARSER (RFC 4180 compliant enough)
-   ========================================================= */
-function parseCSV(text) {
-  const rows = [];
-  let inQuote = false, field = '', row = [], i = 0;
-  const push = () => { row.push(field); field = ''; };
-  while (i < text.length) {
-    const c = text[i];
-    if (inQuote) {
-      if (c === '"') {
-        if (text[i+1] === '"') { field += '"'; i += 2; continue; }
-        inQuote = false;
-      } else {
-        field += c;
-      }
-    } else {
-      if (c === '"') { inQuote = true; }
-      else if (c === ',') { push(); }
-      else if (c === '\n') { push(); if (row.length > 1 || row[0]) rows.push(row); row = []; }
-      else if (c === '\r') { /* skip */ }
-      else { field += c; }
-    }
-    i++;
+/* ---------- layout ---------- */
+const HOMEX = {Cooper:0, Whatley:0, both:0};
+byId.get('Roy Cooper').fx = 0; byId.get('Roy Cooper').fy = 0;
+const sim = d3.forceSimulation(nodes)
+  .force('link', d3.forceLink(links).id(d => d.id).distance(l => 84 + (2.5 - l.tie) * 56).strength(l => (l.source.isCand || l.target.isCand) ? 0.32 : 0.7))
+  .force('charge', d3.forceManyBody().strength(d => d.isCand ? -800 : -175))
+  .force('collide', d3.forceCollide(d => d.r + 10))
+  .force('x', d3.forceX(d => HOMEX[d.home] ?? 0).strength(d => d.home === 'both' ? 0.2 : 0.05))
+  .force('y', d3.forceY(0).strength(0.045))
+  .stop();
+for (let i = 0; i < 480; i++) sim.tick();
+nodes.forEach(n => { n.bx = n.x; n.by = n.y; });
+let vertical = null;
+function orient(){ const v = innerWidth < 820; if (v === vertical) return false; vertical = v; nodes.forEach(n => { if (v){ n.x = n.by; n.y = n.bx; } else { n.x = n.bx; n.y = n.by; } }); return true; }
+orient();
+
+// intro reveal order: by distance from source
+links.forEach(l => { l.len = Math.hypot(l.target.x - l.source.x, l.target.y - l.source.y); });
+const maxLen = d3.max(links, l => l.len) || 1;
+links.forEach(l => { l.delay = 0.06 + 0.55 * (l.len / maxLen) + (l.source.isCand ? 0 : 0.18); });
+nodes.forEach(n => { n.delay = n.isCand ? 0 : (d3.min(incident.get(n.id), l => l.delay) ?? 0.3) + 0.2; });
+
+/* ---------- canvas ---------- */
+const canvas = document.getElementById('graph');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, dpr = 1;
+let transform = d3.zoomIdentity;
+const zoom = d3.zoom().scaleExtent([0.3, 4.5]).on('zoom', e => { transform = e.transform; });
+d3.select(canvas).call(zoom).on('dblclick.zoom', null);
+
+function resize(){
+  const r = canvas.getBoundingClientRect();
+  W = r.width; H = r.height; dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+}
+let fitted = false;
+function fit(animate){
+  if (W <= 0 || H <= 0) return;
+  fitted = true;
+  const xs = nodes.filter(n => n.vis).map(n => n.x), ys = nodes.filter(n => n.vis).map(n => n.y);
+  if (!xs.length) return;
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const narrow = W < 820;
+  const leftPad = narrow ? 20 : 310, topPad = narrow ? 110 : 100, rightPad = 40, botPad = narrow ? 70 : 50;
+  const aw = W - leftPad - rightPad, ah = H - topPad - botPad;
+  const k = Math.min(aw / (x1 - x0 + 120), ah / (y1 - y0 + 120), 1.6);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const t = d3.zoomIdentity.translate(leftPad + aw / 2 - cx * k, topPad + ah / 2 - cy * k).scale(k);
+  const sel = d3.select(canvas);
+  if (animate && !reduced) sel.transition().duration(650).call(zoom.transform, t); else sel.call(zoom.transform, t);
+}
+
+/* ---------- state & filters ---------- */
+const CATS = [...new Set(DATA.rels.map(r => r.category))].sort();
+const state = {net:'both', groups:new Set(Object.keys(GROUPS)), care:false, cats:new Set(CATS), min:1};
+let selected = null; // {kind:'node'|'link', id}
+let hover = null;
+
+function applyFilters(){
+  nodes.forEach(n => {
+    if (n.isCand) n.vis = state.net === 'both' || CAND[n.id].key === state.net;
+    else n.vis = state.groups.has(n.group) && (state.net === 'both' || n.networks.includes(state.net)) && (!state.care || n.ally || n.bridge) && (n.score || 0) >= state.min;
+  });
+  links.forEach(l => {
+    l.vis = l.source.vis && l.target.vis && (state.net === 'both' || l.network === state.net) && l.rels.some(id => state.cats.has(relById.get(id).category));
+  });
+  if (state.care) nodes.forEach(n => { if (!n.isCand) return; n.vis = n.id === 'Roy Cooper'; });
+  if (state.care) links.forEach(l => { l.vis = l.source.vis && l.target.vis; });
+  // drop isolated non-candidates
+  nodes.forEach(n => { if (!n.isCand && n.vis) n.vis = incident.get(n.id).some(l => l.vis); });
+  updateLegendCounts(); updateStatus();
+  const none = !nodes.some(n => n.vis && !n.isCand);
+  document.getElementById('empty').hidden = !none;
+}
+
+function focusSet(){
+  const f = selected || (hover && {kind:hover.kind, id:hover.id});
+  if (!f) return null;
+  const ns = new Set(), ls = new Set();
+  if (f.kind === 'node'){
+    ns.add(f.id);
+    incident.get(f.id).forEach(l => { if (!l.vis) return; ls.add(l.id); ns.add(l.source.id); ns.add(l.target.id); });
+  } else {
+    const l = links.find(x => x.id === f.id); if (l){ ls.add(l.id); ns.add(l.source.id); ns.add(l.target.id); }
   }
-  if (field || row.length) { push(); rows.push(row); }
-  return rows;
+  return {nodes:ns, links:ls};
 }
 
-function csvToObjects(text) {
-  const rows = parseCSV(text.trim());
-  if (!rows.length) return [];
-  const headers = rows[0];
-  return rows.slice(1).map(r => {
-    const obj = {};
-    headers.forEach((h, i) => { obj[h.trim()] = (r[i] || '').trim(); });
-    return obj;
-  });
+/* ---------- drawing ---------- */
+const t0 = performance.now();
+function drawGrid(t){
+  const step = 46 * t.k; if (step < 14) return;
+  const ox = ((t.x % step) + step) % step, oy = ((t.y % step) + step) % step;
+  ctx.fillStyle = 'rgba(233,238,245,0.07)';
+  for (let x = ox; x < W; x += step) for (let y = oy; y < H; y += step) ctx.fillRect(x, y, 1, 1);
 }
+function draw(now){
+  if (!(W > 0 && H > 0) || netView.hidden){ requestAnimationFrame(draw); return; }
+  const t = transform, k = t.k, rs = Math.pow(k, 0.6), ws = Math.sqrt(k);
+  const p = reduced ? 9 : (now - t0) / 1900;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  drawGrid(t);
+  const focus = focusSet();
 
-/* =========================================================
-   DATA PROCESSING
-   ========================================================= */
-let allEdges = [];
-let nodeMap = new Map();   // name -> node data
-let edgesByNode = new Map(); // name -> [edges]
+  // links
+  ctx.lineCap = 'round';
+  for (const l of links){
+    if (!l.vis) continue;
+    const g = clamp((p - l.delay) / 0.26); if (g <= 0) continue;
+    const x1 = t.applyX(l.source.x), y1 = t.applyY(l.source.y), x2 = t.applyX(l.target.x), y2 = t.applyY(l.target.y);
+    const inF = focus ? focus.links.has(l.id) : true;
+    const a = focus ? (inF ? 0.9 : 0.045) : 0.3;
+    ctx.strokeStyle = rgba(l.color, a);
+    ctx.lineWidth = (0.5 + l.tie * 0.55) * ws;
+    ctx.setLineDash(l.valence === 'adversarial' ? [6, 5] : l.valence === 'neutral' ? [2, 5] : []);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 + (x2 - x1) * g, y1 + (y2 - y1) * g); ctx.stroke();
+    l._g = g;
+  }
+  ctx.setLineDash([]);
 
-function processData() {
-  allEdges = csvToObjects(CSV_DATA);
+  // signal pulses
+  if (!reduced){
+    ctx.globalCompositeOperation = 'lighter';
+    for (const l of links){
+      if (!l.vis || l._g < 1 || l.valence === 'adversarial') continue;
+      const inF = focus ? focus.links.has(l.id) : true;
+      const a = focus ? (inF ? 1 : 0.05) : 0.75;
+      const x1 = t.applyX(l.source.x), y1 = t.applyY(l.source.y), x2 = t.applyX(l.target.x), y2 = t.applyY(l.target.y);
+      const pr = 1.3 * ws + 0.5;
+      for (let i = 0; i < l.count; i++){
+        const tt = ((now * l.speed) + i / l.count + l.phase) % 1;
+        const x = x1 + (x2 - x1) * tt, y = y1 + (y2 - y1) * tt;
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, pr * 4);
+        grad.addColorStop(0, rgba(l.color, a)); grad.addColorStop(1, rgba(l.color, 0));
+        ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(x, y, pr * 4, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
 
-  // Build node map
-  nodeMap.clear();
-  edgesByNode.clear();
-
-  // Add Roy Cooper
-  nodeMap.set('Roy Cooper', {
-    id: 'Roy Cooper',
-    type: 'candidate',
-    is_sitting_member: 'False',
-    is_nc_delegation: 'True',
-    committee_assignments: '',
-    term_status: '',
-    maxScore: 5.0,
-    notes: '',
-    role: 'Governor of North Carolina (D), 2017-2025; U.S. Senate candidate 2026',
-    isCooper: true,
-  });
-  edgesByNode.set('Roy Cooper', []);
-
-  allEdges.forEach(e => {
-    const b = e.node_b;
-    if (!nodeMap.has(b)) {
-      nodeMap.set(b, {
-        id: b,
-        type: e.node_b_type,
-        is_sitting_member: e.is_sitting_member,
-        is_nc_delegation: e.is_nc_delegation,
-        committee_assignments: e.committee_assignments,
-        term_status: e.term_status,
-        maxScore: parseFloat(e.influence_score) || 0,
-        notes: e.notes,
-        role: ROLES[b] || e.node_b_type,
-        isCooper: false,
-      });
+  // nodes
+  for (const n of nodes){
+    if (!n.vis) continue;
+    let a = n.isCand ? 1 : clamp((p - n.delay) / 0.25);
+    if (a <= 0) continue;
+    if (focus && !focus.nodes.has(n.id)) a *= 0.15;
+    const x = t.applyX(n.x), y = t.applyY(n.y), r = n.r * rs;
+    ctx.globalAlpha = a;
+    if (n.isCand){
+      const halo = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 3.2);
+      halo.addColorStop(0, rgba(n.color, 0.35)); halo.addColorStop(1, rgba(n.color, 0));
+      ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = n.color; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.fillStyle = n.color; ctx.beginPath(); ctx.arc(x, y, r * 0.42, 0, Math.PI * 2); ctx.fill();
     } else {
-      const n = nodeMap.get(b);
-      n.maxScore = Math.max(n.maxScore, parseFloat(e.influence_score) || 0);
-    }
-    // Track edges per node
-    if (!edgesByNode.has('Roy Cooper')) edgesByNode.set('Roy Cooper', []);
-    if (!edgesByNode.has(b)) edgesByNode.set(b, []);
-    edgesByNode.get('Roy Cooper').push(e);
-    edgesByNode.get(b).push(e);
-  });
-
-  computeAlliesAndBridges();
-}
-
-/* =========================================================
-   ALLIES / BRIDGES COMPUTATION
-   ========================================================= */
-let allies = [], bridges = [];
-
-function computeAlliesAndBridges() {
-  allies = []; bridges = [];
-  nodeMap.forEach((node, name) => {
-    if (name === 'Roy Cooper') return;
-    if (ORGS_EXCLUDE.has(name)) return;
-    if (FORMER_EXCLUDE.has(name)) return;
-
-    // Check any positive valence edge
-    const edges = edgesByNode.get(name) || [];
-    const posEdges = edges.filter(e => e.relationship_valence === 'positive');
-    if (!posEdges.length) return;
-
-    // Compute cross_party and aid_stance from edges (max/any)
-    const isCrossParty = posEdges.some(e => e.cross_party === 'True');
-    const aidStances = posEdges.map(e => parseFloat(e.aid_stance)).filter(v => !isNaN(v));
-    const maxAidStance = aidStances.length ? Math.max(...aidStances) : 0;
-
-    // Bridge: cross_party OR aid_stance == 0.0
-    if (isCrossParty || maxAidStance === 0.0) {
-      bridges.push({ name, score: node.maxScore, role: node.role });
-    } else if (maxAidStance >= 0.5) {
-      allies.push({ name, score: node.maxScore, role: node.role });
-    }
-  });
-
-  allies.sort((a, b) => b.score - a.score);
-  bridges.sort((a, b) => b.score - a.score);
-}
-
-/* =========================================================
-   FILTER STATE
-   ========================================================= */
-let filterState = {
-  group: 'all',
-  relTypes: new Set(['disaster_response','legislative/governing','business_recruitment','campaign/endorsement','professional']),
-  minScore: 1.0,
-  search: '',
-};
-
-/* =========================================================
-   GRAPH
-   ========================================================= */
-let Graph = null;
-let is3D = true;
-let graphData = { nodes: [], links: [] };
-let highlightNodes = new Set();
-let highlightLinks = new Set();
-
-function buildGlowSprite(color, size = 32) {
-  const canvas = document.createElement('canvas');
-  canvas.width = size; canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  const r = size / 2;
-  const grad = ctx.createRadialGradient(r, r, 0, r, r, r);
-  grad.addColorStop(0, color + 'ff');
-  grad.addColorStop(0.4, color + 'aa');
-  grad.addColorStop(1, color + '00');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, size);
-  return canvas;
-}
-
-function nodeSize(node) {
-  if (node.isCooper) return 18;
-  return 5 + (node.maxScore || 1) * 2.2;
-}
-
-function getFilteredGraphData() {
-  const visibleNodes = new Set();
-  const visibleLinks = [];
-
-  // Determine which nodes pass filters
-  const allyNames = new Set(allies.map(a => a.name));
-  const bridgeNames = new Set(bridges.map(b => b.name));
-
-  allEdges.forEach(e => {
-    const score = parseFloat(e.influence_score) || 0;
-    if (score < filterState.minScore) return;
-    if (!filterState.relTypes.has(e.relationship_type)) return;
-
-    const name = e.node_b;
-    // Group filter
-    if (filterState.group === 'allies' && !allyNames.has(name)) return;
-    if (filterState.group === 'bridges' && !bridgeNames.has(name)) return;
-
-    // Search filter
-    if (filterState.search) {
-      const q = filterState.search.toLowerCase();
-      if (!name.toLowerCase().includes(q)) return;
-    }
-
-    visibleNodes.add('Roy Cooper');
-    visibleNodes.add(name);
-    visibleLinks.push(e);
-  });
-
-  const nodes = [...visibleNodes].map(name => ({ ...nodeMap.get(name) }));
-  const links = visibleLinks.map((e, idx) => ({
-    source: e.node_a,
-    target: e.node_b,
-    relationship_type: e.relationship_type,
-    relationship_valence: e.relationship_valence,
-    relationship_detail: e.relationship_detail,
-    period: e.period,
-    evidence: e.evidence,
-    influence_score: e.influence_score,
-    source_url: e.source_url,
-    _rawEdge: e,
-    _idx: idx,
-  }));
-
-  return { nodes, links };
-}
-
-function initGraph() {
-  const container = document.getElementById('graph-container');
-  Graph = ForceGraph3D()(container)
-    .backgroundColor('#0a0e27')
-    .nodeId('id')
-    .nodeLabel(n => `<span style="color:#f1f5f9;font-size:13px;background:rgba(10,14,39,0.9);padding:4px 8px;border-radius:6px;">${n.id}</span>`)
-    .nodeThreeObject(node => {
-      const color = NODE_COLORS[node.type] || '#94a3b8';
-      const spriteMap = new THREE.CanvasTexture(buildGlowSprite(color, 64));
-      const mat = new THREE.SpriteMaterial({ map: spriteMap, transparent: true, depthWrite: false });
-      const sprite = new THREE.Sprite(mat);
-      const s = nodeSize(node) * 1.6;
-      sprite.scale.set(s, s, 1);
-
-      // For sitting members: add white ring outline
-      if (node.is_sitting_member === 'True' && !node.isCooper) {
-        const ringGeo = new THREE.RingGeometry(nodeSize(node) * 0.5, nodeSize(node) * 0.65, 24);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        const group = new THREE.Group();
-        group.add(sprite);
-        group.add(ring);
-        return group;
+      ctx.shadowColor = n.color; ctx.shadowBlur = 12;
+      ctx.fillStyle = n.color; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      if (n.ally || n.bridge){
+        ctx.strokeStyle = n.ally ? '#4C8DFF' : '#FFB547'; ctx.lineWidth = 1.6;
+        ctx.setLineDash(n.bridge ? [3, 2.5] : []);
+        ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
       }
-      return sprite;
-    })
-    .nodeThreeObjectExtend(false)
-    .linkColor(link => {
-      if (link.relationship_valence === 'adversarial') return 'rgba(100,116,139,0.35)';
-      const c = REL_COLORS[link.relationship_type] || '#94a3b8';
-      return c + '66';
-    })
-    .linkWidth(link => highlightLinks.has(link) ? 2.5 : 1.0)
-    .linkOpacity(0.5)
-    .linkCurvature(0.25)
-    .linkDirectionalParticles(0)
-    .onNodeClick(node => openNodeSidebar(node))
-    .onLinkClick(link => openEdgeSidebar(link))
-    .onNodeHover(node => {
-      highlightNodes.clear(); highlightLinks.clear();
-      if (node) {
-        highlightNodes.add(node);
-        (edgesByNode.get(node.id) || []).forEach(e => {
-          graphData.links.forEach(l => {
-            if (l._rawEdge === e) highlightLinks.add(l);
-          });
-        });
-      }
-      container.style.cursor = node ? 'pointer' : 'default';
-      Graph.linkColor(Graph.linkColor());
-    })
-    .onLinkHover(link => {
-      highlightLinks.clear();
-      if (link) highlightLinks.add(link);
-      container.style.cursor = link ? 'pointer' : 'default';
-      Graph.linkColor(Graph.linkColor());
-    });
+    }
+    if (selected && selected.kind === 'node' && selected.id === n.id){
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, r + (n.isCand ? 7 : 8), 0, Math.PI * 2); ctx.stroke();
+    }
+    n._sx = x; n._sy = y; n._sr = r;
+  }
+  ctx.globalAlpha = 1;
 
-  // Pin Cooper at center after warm-up
-  Graph.d3Force('charge').strength(-120);
-  Graph.d3Force('link').distance(80);
-
-  applyGraphData();
+  // labels (greedy collision avoidance, highest priority first)
+  const boxes = [];
+  const sel = selected && selected.kind === 'node' ? selected.id : null;
+  const order = nodes.filter(n => n.vis).map(n => {
+    const isHover = hover && hover.kind === 'node' && hover.id === n.id;
+    const inF = focus ? focus.nodes.has(n.id) : false;
+    const pr = n.isCand ? 0 : (n.id === sel || isHover) ? 1 : inF ? 2 : (n.ally || n.bridge) ? 3 : n.networks.length === 2 ? 4 : 5;
+    return {n, pr, isHover, inF};
+  }).sort((a,b) => a.pr - b.pr || (b.n.score||0) - (a.n.score||0));
+  const hit = b => boxes.some(o => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]);
+  for (const {n, pr, isHover, inF} of order){
+    const a0 = n.isCand ? 1 : clamp((p - n.delay - 0.15) / 0.25); if (a0 <= 0) continue;
+    let want = pr <= 2 || !focus;
+    if (focus && pr > 2) want = false;
+    if (!want) continue;
+    if (n.isCand){
+      ctx.font = `600 ${Math.round(16 + 2 * Math.min(k,1.5))}px "Chakra Petch", sans-serif`;
+      const w = ctx.measureText(n.name).width, x = n._sx - w / 2, y = n._sy + n._sr * 1.9 + 18;
+      boxes.push([x - 4, y - 16, x + w + 4, y + 6]);
+      ctx.globalAlpha = a0; ctx.textAlign = 'left';
+      ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.strokeText(n.name, x, y);
+      ctx.fillStyle = n.color; ctx.fillText(n.name, x, y);
+      continue;
+    }
+    ctx.font = `600 12px "Manrope", sans-serif`;
+    const w = ctx.measureText(n.name).width;
+    let x = n._sx + n._sr + 7, y = n._sy + 4;
+    let b = [x - 2, y - 11, x + w + 2, y + 4];
+    if (hit(b)){ x = n._sx - n._sr - 7 - w; b = [x - 2, y - 11, x + w + 2, y + 4]; }
+    if (hit(b) && pr > 1) continue;
+    boxes.push(b);
+    ctx.globalAlpha = a0; ctx.textAlign = 'left';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.88)'; ctx.strokeText(n.name, x, y);
+    ctx.fillStyle = (inF || isHover) ? '#E9EEF5' : '#AEB7C5';
+    ctx.fillText(n.name, x, y);
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'left';
+  requestAnimationFrame(draw);
 }
 
-function applyGraphData() {
-  graphData = getFilteredGraphData();
-  Graph.graphData(graphData);
+/* ---------- hit testing ---------- */
+function segDist(px, py, x1, y1, x2, y2){
+  const dx = x2 - x1, dy = y2 - y1, L = dx * dx + dy * dy;
+  let u = L ? ((px - x1) * dx + (py - y1) * dy) / L : 0; u = clamp(u);
+  return Math.hypot(px - (x1 + u * dx), py - (y1 + u * dy));
+}
+function pick(px, py){
+  let best = null, bd = Infinity;
+  for (const n of nodes){
+    if (!n.vis || n._sx == null) continue;
+    const d = Math.hypot(px - n._sx, py - n._sy);
+    if (d < n._sr + 10 && d < bd){ bd = d; best = {kind:'node', id:n.id}; }
+  }
+  if (best) return best;
+  const t = transform; bd = 9;
+  for (const l of links){
+    if (!l.vis) continue;
+    const d = segDist(px, py, t.applyX(l.source.x), t.applyY(l.source.y), t.applyX(l.target.x), t.applyY(l.target.y));
+    if (d < bd){ bd = d; best = {kind:'link', id:l.id}; }
+  }
+  return best;
+}
+canvas.addEventListener('mousemove', e => {
+  const r = canvas.getBoundingClientRect();
+  hover = pick(e.clientX - r.left, e.clientY - r.top);
+  canvas.classList.toggle('hit', !!hover);
+});
+canvas.addEventListener('mouseleave', () => { hover = null; canvas.classList.remove('hit'); });
+canvas.addEventListener('click', e => {
+  const r = canvas.getBoundingClientRect();
+  const hit = pick(e.clientX - r.left, e.clientY - r.top);
+  if (hit) select(hit); else closePanel();
+});
 
-  // Pin Cooper
-  setTimeout(() => {
-    const cooperNode = graphData.nodes.find(n => n.id === 'Roy Cooper');
-    if (cooperNode) { cooperNode.fx = 0; cooperNode.fy = 0; cooperNode.fz = 0; }
-    updateCountLine(graphData);
-  }, 50);
+/* ---------- side panel ---------- */
+const panel = document.getElementById('panel');
+function groupLabel(n){ return n.isCand ? 'Candidate' : GROUPS[n.group].label; }
+function chipsFor(n){
+  const c = [];
+  if (n.ally) c.push('<span class="chip ally">Pro-aid ally of Cooper</span>');
+  if (n.bridge) c.push('<span class="chip bridge">Cross-party contact</span>');
+  if (!n.isCand && n.networks.length === 2) c.push('<span class="chip">Connected to both candidates</span>');
+  if (n.is_sitting_member) c.push('<span class="chip">Sitting member of Congress</span>');
+  if (n.is_nc_delegation) c.push('<span class="chip">NC delegation</span>');
+  if (n.cross_party_with && n.cross_party_with.length) c.push(`<span class="chip">Cross-party tie to ${esc([...new Set(n.cross_party_with)].join(' and '))}</span>`);
+  return c.length ? `<div class="chips">${c.join('')}</div>` : '';
+}
+function relCard(r, viewpointId){
+  const other = r.a === viewpointId ? r.b : r.a;
+  const o = byId.get(other);
+  const val = r.valence === 'adversarial' ? '<span class="chip adv">Adversarial</span>' : r.valence === 'neutral' ? '<span class="chip">Unconfirmed or indirect</span>' : '';
+  const who = viewpointId ? `<button data-open="${esc(other)}">${esc(other)}</button>` : `${esc(r.a)} and ${esc(r.b)}`;
+  return `<li>
+    <div class="who"><span class="dot" style="--c:${o ? o.color : GREY}"></span>${who}${val}</div>
+    <div class="meta">${esc(r.category)}${r.period ? ', ' + esc(r.period) : ''}. Tie strength ${r.tie}, score ${r.score}.</div>
+    <p class="ev">${esc(r.evidence || r.detail)}</p>
+    ${srcLink(r.url)}
+  </li>`;
+}
+function bars(b){
+  const row = (label, v, max, c) => `<div class="bar"><span>${label}</span><span class="track"><span class="fill" style="width:${(v/max)*100}%; --c:${c}"></span></span><span class="v">${v}</span></div>`;
+  return `<div class="bars">${row('Relationship', b.tie, 2.5, '#E9EEF5')}${row('Say over aid', b.power, 1, '#FFB547')}${row('Stance on aid', b.stance, 1, '#4C8DFF')}</div>`;
+}
+/* plain-language summaries built from each relationship record */
+const CAT_PHRASE = {'Legislative and governing':'legislative and governing work','Disaster response':'disaster response','Campaign and endorsement':'campaign support and endorsements','Business recruitment':'business recruitment','Professional':'professional work','Lobbying client':'lobbying work','Donor and financial':'political finance','Faith and civic':'faith and civic life'};
+const phrase = c => CAT_PHRASE[c] || String(c || '').toLowerCase();
+const when = p => p ? ` (${p})` : '';
+const endStop = s => { s = String(s || '').trim(); if (!s) return ''; return /[.!?]["\u201d]?$/.test(s) ? s : s + '.'; };
+const capFirst = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+const lowFirst = s => (s && /^[A-Z][a-z]/.test(s)) ? s[0].toLowerCase() + s.slice(1) : s;
+function strengthLine(r){
+  if (r.valence !== 'positive') return '';
+  return r.tie >= 2.5 ? 'This is classified as direct collaboration, the highest tie-strength level in this analysis.'
+    : r.tie >= 1.5 ? 'This is classified as a documented individual interaction.'
+    : 'This is classified as a group-level tie and does not by itself indicate a personal relationship.';
+}
+function stanceClause(n){
+  if (n.stanceLabel === 'Supported the 2025 cuts') return 'a public record supporting the 2025 foreign aid cuts';
+  if (n.stanceLabel && n.stanceLabel.startsWith('Supports')) return 'a public record supporting foreign aid or opposing the 2025 cuts';
+  return 'no public record on foreign aid identified';
+}
+function roleLine(n){
+  if (!n || n.isCand) return '';
+  if (n.ally) return `For CARE\u2019s purposes, ${n.name} is classified as a pro-aid ally: a documented positive relationship with Cooper and ${stanceClause(n)}.`;
+  if (n.bridge){
+    const xp = n.cross_party_with && n.cross_party_with.includes('Cooper') ? ', across party lines' : '';
+    return `For CARE\u2019s purposes, ${n.name} is classified as a cross-party contact: a documented working relationship with Cooper${xp}, with ${stanceClause(n)}.`;
+  }
+  if (n.stanceLabel === 'Supported the 2025 cuts') return `${n.name} has a public record supporting the 2025 foreign aid cuts.`;
+  if (n.stanceLabel && n.stanceLabel.startsWith('Supports')) return `${n.name} has a public record supporting foreign aid or opposing the 2025 cuts.`;
+  return '';
+}
+function connLine(r, total){
+  const ph = phrase(r.category);
+  const extra = total > 1 ? ` This is one of ${total} documented relationships between them.` : '';
+  if (r.valence === 'adversarial') return `${r.a} and ${r.b} have a documented adversarial interaction related to ${ph}${when(r.period)}.${extra}`;
+  if (r.valence === 'neutral') return `${r.a} and ${r.b} have an indirect or unverified connection related to ${ph}${when(r.period)}.${extra}`;
+  return `${r.a} and ${r.b} have a documented relationship in ${ph}${when(r.period)}.${extra}`;
+}
+const evidenceLine = r => { const e = endStop(r.evidence || r.detail); return e ? `Recorded evidence: ${capFirst(e)}` : ''; };
+function describeLink(l){
+  const rs = l.rels.map(id => relById.get(id)).sort((a,b) => b.tie - a.tie || b.score - a.score || (b.evidence || '').length - (a.evidence || '').length);
+  const r = rs[0];
+  const other = l.source.isCand ? l.target : (l.target.isCand ? l.source : null);
+  return [connLine(r, rs.length), evidenceLine(r), roleLine(other) || strengthLine(r)].filter(Boolean).join(' ');
+}
+function describeNode(n){
+  const rs = incident.get(n.id).flatMap(l => l.rels.map(id => relById.get(id)));
+  if (n.isCand){
+    const tally = d3.rollups(rs, v => v.length, r => r.category).sort((a,b) => b[1] - a[1]);
+    const top = tally.slice(0, 2).map(([c]) => phrase(c));
+    return `This map documents ${rs.length} relationships involving ${n.name}, most frequently in ${top.join(' and ')}. Select any connection to view the relationship and its source.`;
+  }
+  const cands = n.networks.map(k => k === 'Cooper' ? 'Roy Cooper' : 'Michael Whatley');
+  const count = rs.length === 1 ? 'one documented relationship' : `${rs.length} documented relationships`;
+  const s1 = `${n.name} (${lowFirst(n.typeLabel)}) has ${count} with ${cands.join(' and ') || 'this network'} in this map.`;
+  const pref = r => (n.ally || n.bridge) && r.a === 'Roy Cooper' ? 1 : 0;
+  const best = rs.slice().filter(r => r.valence === 'positive').sort((a,b) => pref(b) - pref(a) || b.tie - a.tie || b.score - a.score || (b.evidence || '').length - (a.evidence || '').length)[0] || rs[0];
+  const s2 = best ? `${rs.length > 1 ? 'The strongest is' : 'It is'} classified as ${phrase(best.category)}${when(best.period)}. ${evidenceLine(best)}` : '';
+  const s3 = roleLine(n) || (best ? strengthLine(best) : '');
+  return [s1, s2, s3].filter(Boolean).join(' ');
 }
 
-function updateCountLine(data) {
-  const people = data.nodes.filter(n => n.id !== 'Roy Cooper').length;
-  const rels = data.links.length;
-  document.getElementById('count-line').textContent = `Showing ${people} people, ${rels} relationships`;
-  document.getElementById('empty-state').style.display = people === 0 ? 'block' : 'none';
+function nodePanel(n){
+  const myRels = incident.get(n.id).flatMap(l => l.rels.map(id => relById.get(id)));
+  let html = `<div class="p-bar"><span class="dot" style="--c:${n.color}"></span><span class="grp">${esc(groupLabel(n))}</span><button class="close" data-close>Close</button></div><div class="p-body">`;
+  html += `<h2>${esc(n.name)}</h2><p class="role">${esc(n.typeLabel)}</p>${chipsFor(n)}<p class="summary">${esc(describeNode(n))}</p>`;
+  if (n.isCand){
+    const tally = d3.rollups(myRels, v => v.length, r => r.category).sort((a,b) => b[1] - a[1]);
+    html += `<section><h3>Relationships by type</h3><div class="cat-tally">${tally.map(([c,v]) => `<div class="bar"><span>${esc(c)}</span><span class="track"><span class="fill" style="width:${v / tally[0][1] * 100}%; --c:${n.color}"></span></span><span class="v">${v}</span></div>`).join('')}</div></section>`;
+    const sorted = myRels.slice().sort((a,b) => b.score - a.score);
+    html += `<section><h3>All ${sorted.length} relationships, strongest first</h3><ul class="rels">${sorted.map(r => relCard(r, n.id)).join('')}</ul></section>`;
+  } else {
+    if (n.stanceLabel){
+      html += `<section><h3>Foreign aid stance</h3><p>${esc(n.stanceLabel)}</p>${n.stance_on_aid ? `<p class="small">${esc(n.stance_on_aid)}</p>` : ''}${n.stance_source ? srcLink(n.stance_source) : ''}</section>`;
+    }
+    if (n.note) html += `<section><h3>Status</h3><p>${esc(n.note)}</p>${srcLink(n.note_source)}</section>`;
+    if (n.committee_assignments) html += `<section><h3>Committees or role</h3><p class="small" style="color:var(--ink)">${esc(n.committee_assignments.replace(/\*+/g,'').trim())}</p>${n.is_sitting_member ? srcLink('https://www.congress.gov/members', 'congress.gov') : ''}</section>`;
+    if (n.score != null){
+      html += `<section><h3>Influence score</h3><div class="score"><b>${Number(n.score).toFixed(1)}</b><span>out of 5, from the strongest relationship</span></div>${bars(n.breakdown)}</section>`;
+    }
+    html += `<section><h3>${myRels.length === 1 ? 'Relationship' : myRels.length + ' relationships'}</h3><ul class="rels">${myRels.sort((a,b) => b.score - a.score).map(r => relCard(r, n.id)).join('')}</ul></section>`;
+  }
+  return html + '</div>';
+}
+function linkPanel(l){
+  const rs = l.rels.map(id => relById.get(id));
+  let html = `<div class="p-bar"><span class="grp">Relationship</span><button class="close" data-close>Close</button></div><div class="p-body">`;
+  html += `<h2>${esc(l.source.name)} and ${esc(l.target.name)}</h2><p class="role">${rs.length === 1 ? 'One documented relationship' : rs.length + ' documented relationships'}</p><p class="summary">${esc(describeLink(l))}</p>`;
+  html += `<div class="chips"><button class="chip" data-open="${esc(l.source.id)}">Open ${esc(l.source.name)}</button><button class="chip" data-open="${esc(l.target.id)}">Open ${esc(l.target.name)}</button></div>`;
+  html += `<section><ul class="rels">${rs.map(r => relCard(r, null)).join('')}</ul></section>`;
+  const t = l.target;
+  if (t.stance_source){ html += `<section><h3>${esc(t.name)}’s stance on aid</h3><p>${esc(t.stanceLabel || '')}</p>${t.stance_on_aid ? `<p class="small">${esc(t.stance_on_aid)}</p>` : ''}${srcLink(t.stance_source)}</section>`; }
+  return html + '</div>';
+}
+function select(hit){
+  selected = hit;
+  if (hit.kind === 'node') panel.innerHTML = nodePanel(byId.get(hit.id));
+  else panel.innerHTML = linkPanel(links.find(l => l.id === hit.id));
+  panel.classList.add('open');
+  panel.querySelector('.p-body').scrollTop = 0;
+}
+function closePanel(){ selected = null; panel.classList.remove('open'); }
+panel.addEventListener('click', e => {
+  const o = e.target.closest('[data-open]'); if (o){ const n = byId.get(o.dataset.open); if (n){ if(!n.vis){ resetFilters(); } select({kind:'node', id:n.id}); centerOn(n); } return; }
+  if (e.target.closest('[data-close]')) closePanel();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+
+function centerOn(n){
+  const k = Math.max(transform.k, 1.3);
+  const narrow = W < 820;
+  const cx = narrow ? W / 2 : (W - 412) / 2 + 150, cy = narrow ? H * 0.28 : H / 2;
+  const t = d3.zoomIdentity.translate(cx - n.x * k, cy - n.y * k).scale(k);
+  const sel = d3.select(canvas);
+  if (reduced) sel.call(zoom.transform, t); else sel.transition().duration(600).call(zoom.transform, t);
 }
 
-/* =========================================================
-   FILTER WIRING
-   ========================================================= */
-function resetFilters() {
-  filterState = {
-    group: 'all',
-    relTypes: new Set(['disaster_response','legislative/governing','business_recruitment','campaign/endorsement','professional']),
-    minScore: 1.0,
-    search: '',
+/* ---------- controls ---------- */
+const legend = document.getElementById('legend');
+legend.innerHTML = Object.entries(GROUPS).map(([k,g]) => `<li><button data-group="${k}" aria-pressed="true"><span class="dot" style="--c:${g.color}"></span>${g.label}<span class="n" data-count="${k}"></span></button></li>`).join('');
+legend.addEventListener('click', e => {
+  const b = e.target.closest('[data-group]'); if (!b) return;
+  const k = b.dataset.group; const on = state.groups.has(k);
+  if (on) state.groups.delete(k); else state.groups.add(k);
+  b.setAttribute('aria-pressed', String(!on)); applyFilters();
+});
+function updateLegendCounts(){
+  Object.keys(GROUPS).forEach(k => {
+    const el = legend.querySelector(`[data-count="${k}"]`);
+    el.textContent = nodes.filter(n => n.group === k && !n.isCand && (state.net === 'both' || n.networks.includes(state.net))).length;
+  });
+}
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+  state.net = b.dataset.net;
+  document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  applyFilters(); fit(true);
+}));
+const careBtn = document.getElementById('care');
+careBtn.addEventListener('click', () => {
+  state.care = !state.care; careBtn.setAttribute('aria-pressed', String(state.care));
+  if (state.care){ state.net = 'both'; document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.net === 'both'))); }
+  applyFilters(); fit(true);
+});
+function resetFilters(){
+  state.net = 'both'; state.care = false; state.groups = new Set(Object.keys(GROUPS)); state.cats = new Set(CATS); state.min = 1;
+  catBox.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', 'true'));
+  minEl.value = 1; minOut.textContent = '1';
+  document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.net === 'both')));
+  careBtn.setAttribute('aria-pressed', 'false');
+  legend.querySelectorAll('[data-group]').forEach(b => b.setAttribute('aria-pressed', 'true'));
+  applyFilters();
+}
+const catBox = document.getElementById('cats');
+catBox.innerHTML = CATS.map(c => `<button type="button" data-cat="${esc(c)}" aria-pressed="true">${esc(c)}</button>`).join('');
+catBox.addEventListener('click', e => {
+  const b = e.target.closest('[data-cat]'); if (!b) return;
+  const c = b.dataset.cat, on = state.cats.has(c);
+  if (on) state.cats.delete(c); else state.cats.add(c);
+  b.setAttribute('aria-pressed', String(!on)); applyFilters();
+});
+const minEl = document.getElementById('minscore'), minOut = document.getElementById('minv');
+minEl.addEventListener('input', () => { state.min = Number(minEl.value); minOut.textContent = minEl.value; applyFilters(); });
+document.getElementById('reset').addEventListener('click', () => { resetFilters(); fit(true); });
+document.getElementById('empty-reset').addEventListener('click', () => { resetFilters(); fit(true); });
+function personRow(n){
+  const role = n.typeLabel + (n.is_nc_delegation ? ', North Carolina' : '');
+  return `<li><button type="button" data-open="${esc(n.id)}"><span class="nm">${esc(n.name)}</span><span class="rl">${esc(role)}</span><span class="sc">${Number(n.score).toFixed(1)}</span></button></li>`;
+}
+const byScore = (a,b) => (b.score||0) - (a.score||0) || a.name.localeCompare(b.name);
+document.getElementById('list-allies').innerHTML = nodes.filter(n => n.ally).sort(byScore).map(personRow).join('');
+document.getElementById('list-contacts').innerHTML = nodes.filter(n => n.bridge).sort(byScore).map(personRow).join('');
+controlsEl().addEventListener('click', e => {
+  const o = e.target.closest('.people [data-open]'); if (!o) return;
+  const n = byId.get(o.dataset.open); if (!n) return;
+  if (!n.vis) resetFilters();
+  select({kind:'node', id:n.id}); centerOn(n);
+  if (W < 820){ controls.classList.remove('show'); toggleBtn.setAttribute('aria-expanded','false'); }
+});
+function controlsEl(){ return document.getElementById('controls'); }
+const hint = document.getElementById('hint');
+let seenHint = false; try { seenHint = localStorage.getItem('coopermap-hint') === '1'; } catch (e) {}
+if (!seenHint) hint.hidden = false;
+document.getElementById('hint-close').addEventListener('click', () => { hint.hidden = true; try { localStorage.setItem('coopermap-hint', '1'); } catch (e) {} });
+canvas.addEventListener('click', () => { if (!hint.hidden){ hint.hidden = true; try { localStorage.setItem('coopermap-hint', '1'); } catch (e) {} } });
+const search = document.getElementById('search');
+document.getElementById('names').innerHTML = nodes.map(n => `<option value="${esc(n.name)}">`).join('');
+function runSearch(){
+  const q = search.value.trim().toLowerCase(); if (!q) return;
+  const n = nodes.find(x => x.name.toLowerCase() === q) || nodes.find(x => x.name.toLowerCase().includes(q));
+  if (!n) return;
+  if (!n.vis) resetFilters();
+  select({kind:'node', id:n.id}); centerOn(n);
+  if (W < 820){ controls.classList.remove('show'); toggleBtn.setAttribute('aria-expanded','false'); }
+}
+search.addEventListener('change', runSearch);
+search.addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+const controls = document.getElementById('controls'), toggleBtn = document.getElementById('toggle-filters');
+toggleBtn.addEventListener('click', () => { document.getElementById('hint').hidden = true; const s = controls.classList.toggle('show'); toggleBtn.setAttribute('aria-expanded', String(s)); });
+
+function updateStatus(){
+  const vn = nodes.filter(n => n.vis && !n.isCand).length;
+  const vr = links.filter(l => l.vis).reduce((s,l) => s + l.rels.length, 0);
+  document.getElementById('status').innerHTML = `Scroll to zoom, drag to move, click any dot or line for its source.`;
+  const total = nodes.filter(n => !n.isCand).length;
+  document.getElementById('shown').innerHTML = `Showing <b>${vn}</b> of ${total} people and organizations, <b>${vr}</b> of ${rels.length} relationships.`;
+}
+
+/* ---------- sources view ---------- */
+function buildTables(){
+  const tb = document.querySelector('#rel-table tbody');
+  const sortState = {key:'score', dir:-1};
+  const keyFn = {name: r => r.b.toLowerCase(), cat: r => r.category, date: r => String(r.period || ''), score: r => r.score};
+  const render = () => {
+  const f = keyFn[sortState.key];
+  const sorted = rels.slice().sort((a,b) => { const x = f(a), y = f(b); return (x < y ? -1 : x > y ? 1 : 0) * sortState.dir || b.score - a.score; });
+  tb.innerHTML = sorted.map(r => {
+    const nb = byId.get(r.b);
+    return `<tr data-text="${esc((r.a+' '+r.b+' '+r.category+' '+r.evidence+' '+(r.domain||'')).toLowerCase())}">
+      <td>${esc(r.b)}</td>
+      <td>${esc(r.category)}${r.valence !== 'positive' ? ` <span class="small">(${esc(r.valence === 'adversarial' ? 'adversarial' : 'unconfirmed or indirect')})</span>` : ''}</td>
+      <td style="white-space:nowrap">${esc(r.period)}</td>
+      <td style="font-variant-numeric:tabular-nums">${r.score}</td>
+      <td>${esc(r.evidence || r.detail)}</td>
+      <td>${srcLink(r.url, r.domain)}</td>
+      <td>${nb && nb.stance_source ? srcLink(nb.stance_source) : '<span class="small">None</span>'}</td></tr>`;
+  }).join('');
+  upd();
   };
-  document.querySelectorAll('input[name="group"]').forEach(r => { r.checked = r.value === 'all'; });
-  document.querySelectorAll('.rel-check').forEach(c => { c.checked = true; });
-  document.getElementById('score-slider').value = 1.0;
-  document.getElementById('slider-val').textContent = '1.0';
-  document.getElementById('search-input').value = '';
-  document.getElementById('search-dropdown').style.display = 'none';
-  applyGraphData();
-}
-
-function wireFilters() {
-  // Group radio
-  document.querySelectorAll('input[name="group"]').forEach(r => {
-    r.addEventListener('change', () => {
-      filterState.group = r.value;
-      applyGraphData();
-    });
+  document.querySelectorAll('#rel-table th [data-sort]').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.sort; sortState.dir = sortState.key === k ? -sortState.dir : (k === 'score' ? -1 : 1); sortState.key = k;
+    document.querySelectorAll('#rel-table th [data-sort]').forEach(x => x.removeAttribute('aria-sort'));
+    b.setAttribute('aria-sort', sortState.dir === 1 ? 'ascending' : 'descending');
+    b.querySelector('.arr').textContent = sortState.dir === 1 ? '↑' : '↓';
+    render();
+  }));
+  const count = document.getElementById('rel-count');
+  const filter = document.getElementById('rel-filter');
+  const upd = () => { const q = filter.value.trim().toLowerCase(); let c = 0; tb.querySelectorAll('tr').forEach(tr => { const m = !q || tr.dataset.text.includes(q); tr.hidden = !m; if (m) c++; }); count.textContent = `${c} of ${rels.length} relationships`; };
+  filter.addEventListener('input', upd); render();
+  document.getElementById('dl').addEventListener('click', () => {
+    const cols = ['person_or_organization','type','relationship_type','period','evidence','source_url','influence_score','aid_stance','aid_stance_source','care_role'];
+    const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const lines = [cols.join(',')].concat(rels.map(r => { const n = byId.get(r.b) || {}; return [r.b, n.typeLabel, r.category, r.period, r.evidence, r.url, r.score, n.stanceLabel, n.stance_source, n.ally ? 'Ally' : n.bridge ? 'Cross-party contact' : ''].map(q).join(','); }));
+    const blob = new Blob(['\ufeff' + lines.join('\n')], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'cooper-relationships.csv';
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   });
-  // Rel type checks
-  document.querySelectorAll('.rel-check').forEach(c => {
-    c.addEventListener('change', () => {
-      if (c.checked) filterState.relTypes.add(c.value);
-      else filterState.relTypes.delete(c.value);
-      applyGraphData();
-    });
-  });
-  // Score slider
-  const slider = document.getElementById('score-slider');
-  slider.addEventListener('input', () => {
-    filterState.minScore = parseFloat(slider.value);
-    document.getElementById('slider-val').textContent = slider.value;
-    applyGraphData();
-  });
-  // Search
-  const searchInput = document.getElementById('search-input');
-  const dropdown = document.getElementById('search-dropdown');
-  searchInput.addEventListener('input', () => {
-    const q = searchInput.value.toLowerCase().trim();
-    filterState.search = q;
-    if (q.length > 0) {
-      const matches = [...nodeMap.keys()].filter(k => k !== 'Roy Cooper' && k.toLowerCase().includes(q));
-      dropdown.innerHTML = matches.slice(0, 8).map(m =>
-        `<div class="dd-item" role="option" tabindex="0" data-name="${m}">${m}</div>`
-      ).join('');
-      dropdown.style.display = matches.length ? 'block' : 'none';
-      dropdown.querySelectorAll('.dd-item').forEach(item => {
-        item.addEventListener('click', () => {
-          searchInput.value = item.dataset.name;
-          filterState.search = item.dataset.name.toLowerCase();
-          dropdown.style.display = 'none';
-          applyGraphData();
-          flyToNode(item.dataset.name);
-        });
-      });
-    } else {
-      dropdown.style.display = 'none';
-    }
-    applyGraphData();
-  });
-  searchInput.addEventListener('blur', () => { setTimeout(() => { dropdown.style.display = 'none'; }, 150); });
-  // Reset
-  document.getElementById('reset-btn').addEventListener('click', resetFilters);
+
+  const fb = document.querySelector('#fact-table tbody') || document.createElement('tbody');
+  fb.innerHTML = DATA.facts.map(f => `<tr>
+    <td>${esc(f.fact)}</td>
+    <td>${esc([f.author, f.title].filter(Boolean).join(', '))}${f.publisher && f.publisher !== f.author ? `<div class="small">${esc(f.publisher)}</div>` : ''}</td>
+    <td style="white-space:nowrap">${esc(f.date || '')}</td>
+    <td>${srcLink(f.url)}${f.alt && safeUrl(f.alt) ? `<div style="margin-top:4px">${srcLink(f.alt, 'Alternate source')}</div>` : ''}</td>
+    <td><span class="status-pill ${f.status === 'Verified' ? '' : 'check'}">${esc(f.status)}</span></td></tr>`).join('');
 }
 
-/* =========================================================
-   CAMERA FLY-TO
-   ========================================================= */
-function flyToNode(name) {
-  const node = graphData.nodes.find(n => n.id === name);
-  if (!node) return;
-  const dist = 150;
-  if (is3D) {
-    const { x, y, z } = node;
-    Graph.cameraPosition({ x: x + dist, y: y + dist, z: z + dist }, { x, y, z }, 800);
-  } else {
-    Graph.centerAt(node.x, node.y, 800);
-    Graph.zoom(2.5, 800);
-  }
+/* ---------- routing ---------- */
+const netView = document.getElementById('network-view'), srcView = document.getElementById('sources-view');
+function route(){
+  const view = location.hash === '#sources' ? 'sources' : 'network';
+  netView.hidden = view !== 'network'; srcView.hidden = view !== 'sources';
+  document.getElementById('tab-network').setAttribute('aria-current', view === 'network' ? 'page' : 'false');
+  document.getElementById('tab-sources').setAttribute('aria-current', view === 'sources' ? 'page' : 'false');
+  if (view === 'network'){ resize(); if (!fitted) fit(false); }
 }
+window.addEventListener('hashchange', route);
+window.addEventListener('resize', () => { if (!netView.hidden){ resize(); if (orient()) fit(false); } });
 
-/* =========================================================
-   SIDEBAR
-   ========================================================= */
-function openSidebar() {
-  const sb = document.getElementById('sidebar');
-  sb.classList.add('open');
-  sb.setAttribute('aria-hidden', 'false');
-}
-function closeSidebar() {
-  const sb = document.getElementById('sidebar');
-  sb.classList.remove('open');
-  sb.setAttribute('aria-hidden', 'true');
-}
-
-function colorBadge(type) {
-  const c = NODE_COLORS[type] || '#94a3b8';
-  return `<span class="sb-type-badge" style="background:${c}22;color:${c};border:1px solid ${c}44;">${type.replace(/_/g,' ')}</span>`;
-}
-function relChip(relType) {
-  const c = REL_COLORS[relType] || '#94a3b8';
-  return `<span class="cat-chip" style="background:${c}22;color:${c};border:1px solid ${c}44;">${relType.replace(/_/g,' ')}</span>`;
-}
-
-function openNodeSidebar(node) {
-  const edges = (edgesByNode.get(node.id) || []);
-  const role = ROLES[node.id] || node.role || node.type;
-  let html = `
-    <h2>${node.id}</h2>
-    ${colorBadge(node.type)}
-    <div class="sb-meta"><strong>Role:</strong> ${role}</div>
-  `;
-  if (node.committee_assignments) html += `<div class="sb-meta"><strong>Committees:</strong> ${node.committee_assignments}</div>`;
-  if (node.term_status) html += `<div class="sb-meta"><strong>Term:</strong> ${node.term_status}</div>`;
-  if (node.notes) html += `<div class="sb-meta"><strong>Notes:</strong> ${node.notes}</div>`;
-
-  if (edges.length) {
-    html += `<div class="sb-section-title">Relationships (${edges.length})</div>`;
-    edges.forEach(e => {
-      html += `
-        <div class="sb-edge">
-          ${relChip(e.relationship_type)}
-          <div class="detail">${e.relationship_detail || ''}</div>
-          <div class="period">${e.period || ''}</div>
-          <div class="evidence">${e.evidence || ''}</div>
-          <div class="score">Influence score: ${e.influence_score}</div>
-          ${e.source_url ? `<a href="${e.source_url}" target="_blank" rel="noopener">Source ↗</a>` : ''}
-          ${e.stance_on_aid ? `<div class="sb-meta" style="margin-top:4px;"><strong>Aid stance:</strong> ${e.stance_on_aid}</div>` : ''}
-        </div>
-      `;
-    });
-  }
-  document.getElementById('sidebar-content').innerHTML = html;
-  openSidebar();
-}
-
-function openEdgeSidebar(link) {
-  const e = link._rawEdge;
-  let html = `
-    <h2>${e.node_a} → ${e.node_b}</h2>
-    ${relChip(e.relationship_type)}
-    <div class="sb-meta"><strong>Detail:</strong> ${e.relationship_detail || ''}</div>
-    <div class="sb-meta"><strong>Period:</strong> ${e.period || ''}</div>
-    <div class="sb-meta"><strong>Evidence:</strong> ${e.evidence || ''}</div>
-    <div class="sb-meta"><strong>Influence Score:</strong> ${e.influence_score}</div>
-    ${e.stance_on_aid ? `<div class="sb-meta"><strong>Aid stance (node_b):</strong> ${e.stance_on_aid}</div>` : ''}
-    ${e.committee_assignments ? `<div class="sb-meta"><strong>Committees:</strong> ${e.committee_assignments}</div>` : ''}
-    ${e.relationship_valence === 'adversarial' ? '<div class="sb-meta" style="color:#ef4444;"><strong>Adversarial relationship</strong></div>' : ''}
-    ${e.source_url ? `<a href="${e.source_url}" target="_blank" rel="noopener" style="font-size:12px;color:#60a5fa;word-break:break-all;display:block;margin-top:8px;">Source ↗</a>` : ''}
-  `;
-  document.getElementById('sidebar-content').innerHTML = html;
-  openSidebar();
-}
-
-/* =========================================================
-   START HERE PANEL
-   ========================================================= */
-function buildStartPanel() {
-  function entryHTML(item, type) {
-    return `
-      <button class="start-entry" data-node="${item.name}" aria-label="Focus on ${item.name}">
-        <div class="en">${item.name}</div>
-        <div class="er">${item.role}</div>
-        <div class="es">Score: ${item.score.toFixed(1)}</div>
-      </button>`;
-  }
-  document.getElementById('allies-list').innerHTML = allies.slice(0, 8).map(a => entryHTML(a, 'ally')).join('');
-  document.getElementById('bridges-list').innerHTML = bridges.slice(0, 8).map(b => entryHTML(b, 'bridge')).join('');
-
-  document.querySelectorAll('.start-entry').forEach(btn => {
-    btn.addEventListener('click', () => {
-      closeStartPanel();
-      const name = btn.dataset.node;
-      // Ensure node is visible
-      filterState.search = '';
-      document.getElementById('search-input').value = '';
-      applyGraphData();
-      setTimeout(() => {
-        flyToNode(name);
-        const node = graphData.nodes.find(n => n.id === name);
-        if (node) openNodeSidebar(node);
-      }, 200);
-    });
-  });
-}
-
-function closeStartPanel() {
-  document.getElementById('start-panel').style.display = 'none';
-}
-
-/* =========================================================
-   SOURCES TABLE
-   ========================================================= */
-let sortCol = 'node_b';
-let sortDir = 1;
-
-function buildSourcesTable() {
-  renderSourcesTable();
-  document.querySelectorAll('#sources-table th').forEach(th => {
-    th.addEventListener('click', () => {
-      const col = th.dataset.col;
-      if (sortCol === col) sortDir *= -1;
-      else { sortCol = col; sortDir = 1; }
-      document.querySelectorAll('#sources-table th').forEach(t => t.classList.remove('sorted'));
-      th.classList.add('sorted');
-      th.querySelector('.sort-arrow').textContent = sortDir === 1 ? '↑' : '↓';
-      renderSourcesTable();
-    });
-  });
-}
-
-function renderSourcesTable() {
-  const rows = [...allEdges].sort((a, b) => {
-    const av = a[sortCol] || '', bv = b[sortCol] || '';
-    return sortDir * av.localeCompare(bv, undefined, { numeric: true });
-  });
-  const tbody = document.getElementById('sources-tbody');
-  tbody.innerHTML = rows.map(e => `
-    <tr>
-      <td>${e.node_b}</td>
-      <td>${e.node_b_type}</td>
-      <td><span style="color:${REL_COLORS[e.relationship_type]||'#94a3b8'}">${e.relationship_type}</span></td>
-      <td>${e.period}</td>
-      <td style="max-width:260px;">${e.evidence}</td>
-      <td>${e.influence_score}</td>
-      <td>${e.source_url ? `<a href="${e.source_url}" target="_blank" rel="noopener">Link ↗</a>` : ''}</td>
-    </tr>
-  `).join('');
-}
-
-/* =========================================================
-   HINT BANNER
-   ========================================================= */
-function dismissHint() {
-  document.getElementById('hint-banner').style.display = 'none';
-  try { localStorage.setItem('hint_dismissed', '1'); } catch(e) {}
-}
-
-function checkHint() {
-  try {
-    if (localStorage.getItem('hint_dismissed')) {
-      document.getElementById('hint-banner').style.display = 'none';
-    }
-  } catch(e) {}
-}
-
-/* =========================================================
-   TABS
-   ========================================================= */
-function switchTab(tab) {
-  const mapActive = tab === 'map';
-  document.getElementById('tab-map').classList.toggle('active', mapActive);
-  document.getElementById('tab-sources').classList.toggle('active', !mapActive);
-  document.getElementById('tab-map').setAttribute('aria-selected', mapActive);
-  document.getElementById('tab-sources').setAttribute('aria-selected', !mapActive);
-  document.getElementById('sources-view').style.display = mapActive ? 'none' : 'block';
-  document.getElementById('graph-container').style.display = mapActive ? 'block' : 'none';
-  document.getElementById('filters-panel').style.display = mapActive ? '' : 'none';
-  document.getElementById('start-panel').style.display = mapActive ? '' : 'none';
-  document.getElementById('dim-toggle').style.display = mapActive ? '' : 'none';
-  document.getElementById('hint-banner').style.display = mapActive ? '' : 'none';
-  if (!mapActive) checkHint();
-}
-
-/* =========================================================
-   3D / 2D TOGGLE
-   ========================================================= */
-function toggleDimension() {
-  is3D = !is3D;
-  document.getElementById('dim-toggle').textContent = is3D ? 'Switch to 2D' : 'Switch to 3D';
-  if (is3D) {
-    Graph.numDimensions(3);
-  } else {
-    Graph.numDimensions(2);
-  }
-}
-
-/* =========================================================
-   KEYBOARD / ESCAPE
-   ========================================================= */
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    closeSidebar();
-    document.getElementById('start-panel').style.display = 'none';
-  }
-});
-
-/* =========================================================
-   MOBILE HAMBURGER
-   ========================================================= */
-document.getElementById('hamburger-btn').addEventListener('click', () => {
-  const fp = document.getElementById('filters-panel');
-  const open = fp.classList.toggle('mobile-open');
-  document.getElementById('hamburger-btn').setAttribute('aria-expanded', open.toString());
-});
-
-/* =========================================================
-   BOOT
-   ========================================================= */
-document.addEventListener('DOMContentLoaded', () => {
-  // Parse data
-  processData();
-
-  // Check hint
-  checkHint();
-
-  // Wire tabs
-  document.getElementById('tab-map').addEventListener('click', () => switchTab('map'));
-  document.getElementById('tab-sources').addEventListener('click', () => { switchTab('sources'); buildSourcesTable(); });
-
-  // Wire sidebar close
-  document.getElementById('sidebar-close').addEventListener('click', closeSidebar);
-
-  // Wire 3D/2D toggle
-  document.getElementById('dim-toggle').addEventListener('click', toggleDimension);
-
-  // Wire filters
-  wireFilters();
-
-  // Build start panel
-  buildStartPanel();
-
-  // Init graph
-  initGraph();
-
-  // Verify counts in console
-  console.log(`Data loaded: ${nodeMap.size} nodes (incl. Roy Cooper), ${allEdges.length} edges`);
-  console.log(`Allies: ${allies.length}`, allies.map(a => a.name));
-  console.log(`Bridges: ${bridges.length}`, bridges.map(b => b.name));
-});
+/* ---------- boot ---------- */
+buildTables();
+route();
+resize();
+applyFilters();
+fit(false);
+requestAnimationFrame(draw);
 </script>
 </body>
 </html>
