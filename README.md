@@ -1,56 +1,100 @@
-# Roy Cooper's Relationship Network
+# Roy Cooper: Relationship Network Map
 
-Interactive map of Senator-elect Roy Cooper's 48 documented political relationships, built for CARE USA foreign aid advocacy.
+> Interactive 3D network visualization of Senator-elect Roy Cooper's 47 documented political relationships, built for foreign-aid advocacy research.
 
-**Live site:** https://aprofit-cooks.github.io/cooper-relationship-map/
+**[→ Live site](https://cooper-relationship-map.netlify.app)**
 
-## What's here
+## Overview
 
-- `index.html` — Self-contained interactive 3D network visualization (Three.js + 3d-force-graph). No server needed.
-- `relationships.csv` — All 48 relationships with evidence, sources, influence scores, and aid stances. Downloadable from the site's Sources tab.
+This project maps every documented relationship between incoming North Carolina Senator Roy Cooper and the people and organizations relevant to U.S. foreign-aid policy. Each relationship is backed by a primary source (press releases, roll-call votes, LDA filings, government records), scored on a 1–5 influence rubric, and classified as an **ally**, **cross-party contact**, or **adversarial** tie.
+
+The visualization is designed for CARE USA staff who need to quickly identify which of Cooper's contacts are most likely to influence his position on foreign aid — and what evidence supports each connection.
+
+## Features
+
+- **3D force-directed network** (Three.js + 3d-force-graph) with 3D/2D toggle
+- **"Start here" panel** with ranked allies and cross-party contacts
+- **Filters**: relationship type, minimum score, group toggles, text search
+- **Click-to-inspect sidebar** with full evidence text and clickable source URLs
+- **Sources tab** with sortable relationship table and CSV download
+- **Mobile-responsive**: collapsible filter drawer, bottom-sheet sidebar
+- **Accessibility**: keyboard navigation, Esc to close, ARIA labels, sufficient contrast
+- **Self-contained**: single HTML file (~107 KB), no backend, works on `file://` or any static host
 
 ## Data
 
-- **48 relationships** connecting Roy Cooper to 38 people and organizations
-- **6 allies** who oppose the 2025 foreign aid cuts
-- **11 cross-party contacts** — Republican ties who supported cuts or have no record
-- Every relationship has a dated source URL
-- Data date: November 2026. Census trade data pulled 2026-10-26.
-
-## Data sources
-
-- NC Governor press releases (governor.nc.gov)
-- Congressional roll call votes (clerk.house.gov, senate.gov)
-- CGD country-level USAID cut estimates (Mar/Aug 2025, Apr 2026)
-- U.S. Census Bureau International Trade API
-- AP, WUNC, Reuters, and other news sources
-
-## How to update
-
-1. Edit `relationships.csv` (or the upstream `appendix_relationships_cooper.csv`)
-2. Run: `python build_site.py <input.csv> <template.html> <output.html>`
-3. Copy the new `index.html` to this repo
-4. Commit and push:
-   ```
-   git add index.html relationships.csv
-   git commit -m "Update relationship data"
-   git push
-   ```
-   GitHub Pages will redeploy automatically within ~60 seconds.
-
-## Influence scoring
-
-Each relationship is scored on a 1–5 scale:
-
-| Component | Values |
+| Metric | Value |
 |---|---|
-| tie_strength | 0.5 (group-level), 1.5 (individual interaction), 2.5 (direct collaboration) |
-| aid_power | 1.0 (aid committee/party leadership), 0.5 (other sitting member), 0 (none) |
-| aid_stance | 1.0 (opposes cuts), 0.5 (no record), 0.0 (supported cuts) |
-| base | +0.5 |
+| Documented relationships | 47 |
+| Unique people and organizations | 38 |
+| Sitting members of Congress | 13 |
+| Source domains | 15 |
+| Data date | November 2026 |
 
-Node score = max edge score for that person.
+All data lives in [`data/relationships.csv`](data/relationships.csv) with a full [data dictionary](docs/DATA_DICTIONARY.md).
 
-## License
+## Tech Stack
 
-Data compiled for academic research (Stanford IR 192, Dr. Gould, Fall 2026). Not for redistribution without permission.
+| Component | Technology |
+|---|---|
+| 3D rendering | [Three.js](https://threejs.org/) v0.160.0 |
+| Force layout | [3d-force-graph](https://github.com/vasturiano/3d-force-graph) v1.73.3 |
+| Data | CSV embedded as JSON at build time |
+| Hosting | [Netlify](https://netlify.com) (also mirrored on GitHub Pages) |
+| Trade analysis | Python (pandas, matplotlib), U.S. Census International Trade API |
+| Network scoring | Custom influence rubric (see [methodology](docs/METHODOLOGY.md)) |
+
+## Influence Scoring
+
+Each relationship is scored on four components:
+
+```
+influence_score = tie_strength + aid_power + aid_stance + 0.5
+```
+
+| Component | Range | Description |
+|---|---|---|
+| `tie_strength` | 0.5 / 1.5 / 2.5 | Group-level → individual interaction → direct collaboration |
+| `aid_power` | 0 / 0.5 / 1.0 | None → sitting member → aid committee or party leadership |
+| `aid_stance` | 0 / 0.5 / 1.0 | Supported 2025 cuts → no record → opposed cuts |
+| base | 0.5 | Floor |
+
+Node score = maximum edge score for that person.
+
+## Project Structure
+
+```
+├── index.html              # Self-contained interactive visualization
+├── data/
+│   └── relationships.csv   # All 47 relationships with sources and scores
+├── docs/
+│   ├── METHODOLOGY.md      # Scoring rubric, source verification, country groups
+│   └── DATA_DICTIONARY.md  # Column definitions
+└── README.md
+```
+
+## How to Update
+
+1. Edit `data/relationships.csv`
+2. Re-run the build script to regenerate `index.html`:
+   ```bash
+   python build_site.py data/relationships.csv index.html
+   ```
+3. Deploy:
+   ```bash
+   npx netlify-cli deploy --prod --dir .
+   ```
+
+## Research Context
+
+This network visualization is one component of a larger research project on North Carolina's economic exposure to the 2025 U.S. foreign-aid cuts, conducted for Stanford's IR 192 (International Relations capstone). The full project includes:
+
+- **Trade analysis**: NC exports to 31 aid-cut countries using Census International Trade API data (HS4-level, matched-month comparisons)
+- **Firm-level research**: NC textile exporters to Honduras and CAFTA-DR partners
+- **NC–Malawi connections**: National Guard partnership, UNC Project-Malawi, Presbyterian church ties
+- **Candidate network analysis**: 47 documented Cooper relationships with influence scoring
+
+## Author
+
+**Alexander Profit** — Stanford University, Class of 2027
+B.A. Candidate, International Relations and Computer Science
