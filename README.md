@@ -8,7 +8,7 @@
 
 This project maps every documented relationship between incoming North Carolina Senator Roy Cooper and the people and organizations relevant to U.S. foreign-aid policy. Each relationship is backed by a primary source (press releases, roll-call votes, LDA filings, government records), scored on a 1–5 influence rubric, and classified as an **ally**, **cross-party contact**, or **adversarial** tie.
 
-The visualization is designed for CARE USA staff who need to quickly identify which of Cooper's contacts are most likely to influence his position on foreign aid — and what evidence supports each connection.
+The visualization lets researchers and advocates quickly identify which of Cooper's contacts are most likely to influence his position on foreign aid — and what evidence supports each connection.
 
 ## Features
 
